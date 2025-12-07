@@ -1,0 +1,2 @@
+# MMSXX_MSX1PaletteQuantizer_for_HuggingFace
+MMSXX_MSX1PaletteQuantizer on HuggingFace
