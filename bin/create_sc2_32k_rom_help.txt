@@ -1,0 +1,25 @@
+usage: create_sc2_32k_rom.bin [-h] [-o OUTPUT] [--fill-byte FILL_BYTE]
+                              [--background-color BACKGROUND_COLOR]
+                              [--border-color BORDER_COLOR]
+                              image0 [image1]
+
+Embed two SCREEN2 (.sc2) files into a 32 KiB non-MegaROM MSX ROM that
+alternates the images on key press.
+
+positional arguments:
+  image0                Path to the first .sc2 file (displayed first)
+  image1                Path to the second .sc2 file (displayed after key
+                        press). If omitted, the first image is reused.
+
+options:
+  -h, --help            show this help message and exit
+  -o OUTPUT, --output OUTPUT
+                        Output ROM path (defaults to image0 name with .rom
+                        extension)
+  --fill-byte FILL_BYTE
+                        Byte value used to pad unused ROM space (default:
+                        0xFF)
+  --background-color BACKGROUND_COLOR
+                        SCREEN2 background color value (0-15, default: 0)
+  --border-color BORDER_COLOR
+                        VDP border color value (0-15, default: 0)

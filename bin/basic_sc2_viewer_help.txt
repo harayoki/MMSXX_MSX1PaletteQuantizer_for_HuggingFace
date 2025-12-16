@@ -1,0 +1,13 @@
+usage: basic_sc2_viewer.bin [-h] -o OUTPUT
+                            input_files_or_dirs [input_files_or_dirs ...]
+
+Create a MSX disk image with sc2/sc4 viewer. SCREEN5 support has been removed;
+SCREEN4 support is available.
+
+positional arguments:
+  input_files_or_dirs   Input files or directories to process
+
+options:
+  -h, --help            show this help message and exit
+  -o OUTPUT, --output OUTPUT
+                        Output Diskimage(*.dsk) path
