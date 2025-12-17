@@ -77,9 +77,9 @@ def build_palette_css() -> str:
     color: {text_color};
 }}
 
-.palette-checkboxes label:has(input[value=\"{idx}\"]) * {
+.palette-checkboxes label:has(input[value=\"{idx}\"]) * {{
     color: {text_color};
-}
+}}
 """
         )
     return base_css + "\n".join(color_blocks)
