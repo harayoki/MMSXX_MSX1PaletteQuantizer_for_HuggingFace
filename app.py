@@ -1174,7 +1174,9 @@ def update_profile_metadata(title: str, description: str, state: AppState, logs_
 
 
 def export_settings(state: AppState, logs_text: str):
-    export_path = BASE_TEMP / f"settings_export_{uuid.uuid4().hex}.json"
+    export_dir = BASE_TEMP / f"settings_export_{uuid.uuid4().hex}"
+    export_dir.mkdir(parents=True, exist_ok=True)
+    export_path = export_dir / "settings.json"
     export_path.write_text(current_settings_json(), encoding="utf-8")
     logs = append_log(logs_text, "info", t("settings_saved", state.language))
     return str(export_path), overlay_update(t("settings_saved", state.language), "info"), gr.update(value=logs), gr.update(value=current_settings_json())
@@ -1474,9 +1476,7 @@ def launch_app():
                     file_types=[".json"],
                     file_count="single",
                 )
-                settings_download = gr.DownloadButton(
-                    label=t("settings_export", default_lang), file_name="settings.json"
-                )
+                settings_download = gr.DownloadButton(label=t("settings_export", default_lang))
                 settings_save_browser = gr.Button(t("settings_save_browser", default_lang))
                 settings_clear_browser = gr.Button(t("settings_clear_browser", default_lang))
 
