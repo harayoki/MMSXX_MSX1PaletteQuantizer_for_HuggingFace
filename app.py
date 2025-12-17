@@ -533,14 +533,13 @@ def launch_app():
                 info="Default ON (CLI)",
             )
 
-        with gr.Accordion("Preprocess adjustments", open=True):
-            preprocessing = gr.Checkbox(
-                label="Preprocessing",
-                value=True,
-                info="Default ON (CLI). Turn off to skip preprocessing (--no-preprocess).",
-            )
-
+        with gr.Accordion("Preprocess adjustments", open=False):
             with gr.Row():
+                preprocessing = gr.Checkbox(
+                    label="Preprocessing",
+                    value=True,
+                    info="Default ON (CLI). Turn off to skip preprocessing (--no-preprocess).",
+                )
                 posterize = gr.Number(
                     label="Posterize before processing",
                     value=16,
@@ -589,8 +588,6 @@ def launch_app():
                     file_count="single",
                 )
 
-        upload = gr.File(label="Upload images (PNG, up to 32)", file_count="multiple", file_types=["image"])
-
         with gr.Accordion("Weights", open=False):
             with gr.Row():
                 weight_h = gr.Number(label="HSV weight H", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
@@ -602,10 +599,12 @@ def launch_app():
                 weight_b = gr.Number(label="RGB weight B", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
 
         use_colors = gr.CheckboxGroup(
-            label="USE COLOR (1-15)",
+            label="Palette",
             choices=[(f"Color {i}", str(i)) for i in range(1, 16)],
             value=COLOR_CHOICES,
         )
+
+        upload = gr.File(label="Upload images (PNG, up to 32)", file_count="multiple", file_types=["image"])
 
         with gr.Row():
             gallery = gr.Gallery(label="Images", columns=4, height=200)
