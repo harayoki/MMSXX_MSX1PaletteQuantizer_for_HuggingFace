@@ -4,7 +4,7 @@ import tempfile
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import gradio as gr
 
@@ -62,22 +62,18 @@ class AppState:
         return self.images[self.selected_index]
 
 
-def build_cli_args(params: Dict[str, Optional[str]], lut_path: Optional[Path]) -> List[str]:
+def build_cli_args(params: Dict[str, Optional[Union[str, bool, float, List[int]]]], lut_path: Optional[Path]) -> List[str]:
     args: List[str] = []
     color_system = params.get("color_system")
     if color_system:
         args.extend(["--color-system", color_system])
 
     dither = params.get("dither")
-    if dither == "dither":
-        args.append("--dither")
-    elif dither == "no-dither":
+    if dither is False:
         args.append("--no-dither")
 
     dark_dither = params.get("dark_dither")
-    if dark_dither == "dark-dither":
-        args.append("--dark-dither")
-    elif dark_dither == "no-dark-dither":
+    if dark_dither is False:
         args.append("--no-dark-dither")
 
     eight_dot = params.get("eight_dot")
@@ -88,13 +84,49 @@ def build_cli_args(params: Dict[str, Optional[str]], lut_path: Optional[Path]) -
     if distance:
         args.extend(["--distance", distance])
 
+    if params.get("no_preprocess"):
+        args.append("--no-preprocess")
+
+    for weight_key, flag in [
+        ("weight_h", "--weight-h"),
+        ("weight_s", "--weight-s"),
+        ("weight_v", "--weight-v"),
+        ("weight_r", "--weight-r"),
+        ("weight_g", "--weight-g"),
+        ("weight_b", "--weight-b"),
+    ]:
+        weight_val = params.get(weight_key)
+        if weight_val is not None:
+            args.extend([flag, str(weight_val)])
+
+    preprocess_params = {
+        "posterize": "--pre-posterize",
+        "saturation": "--pre-sat",
+        "gamma": "--pre-gamma",
+        "contrast": "--pre-contrast",
+        "hue": "--pre-hue",
+    }
+    for key, flag in preprocess_params.items():
+        val = params.get(key)
+        if val is not None:
+            args.extend([flag, str(val)])
+
+    disabled_colors: List[int] = params.get("disable_colors") or []
+    if disabled_colors:
+        csv = ",".join(str(idx) for idx in disabled_colors)
+        args.extend(["--disable-colors", csv])
+
     if lut_path:
         args.extend(["--pre-lut", str(lut_path)])
 
     return args
 
 
-def convert_image(record: ImageRecord, params: Dict[str, Optional[str]], lut_path: Optional[Path]) -> Tuple[Optional[Path], Optional[Path], str]:
+def convert_image(
+    record: ImageRecord,
+    params: Dict[str, Optional[Union[str, bool, float, List[int]]]],
+    lut_path: Optional[Path],
+) -> Tuple[Optional[Path], Optional[Path], str]:
     out_dir = OUTPUT_DIR / record.image_id
     if out_dir.exists():
         shutil.rmtree(out_dir)
@@ -141,7 +173,29 @@ def update_gallery(state: AppState) -> List[Tuple[str, str]]:
     return [(str(rec.orig_path), rec.name) for rec in state.images]
 
 
-def handle_upload(files, color_system, dither, dark_dither, eight_dot, distance, lut_file, state: AppState):
+def handle_upload(
+    files,
+    color_system,
+    dither,
+    dark_dither,
+    eight_dot,
+    distance,
+    no_preprocess,
+    weight_h,
+    weight_s,
+    weight_v,
+    weight_r,
+    weight_g,
+    weight_b,
+    posterize,
+    saturation,
+    gamma,
+    contrast,
+    hue,
+    disable_colors,
+    lut_file,
+    state: AppState,
+):
     if not files:
         disable = gr.update(interactive=False)
         return (
@@ -150,10 +204,6 @@ def handle_upload(files, color_system, dither, dark_dither, eight_dot, distance,
             None,
             None,
             "",
-            disable,
-            disable,
-            disable,
-            disable,
             disable,
             disable,
             disable,
@@ -169,12 +219,27 @@ def handle_upload(files, color_system, dither, dark_dither, eight_dot, distance,
     else:
         state.lut_path = None
 
+    selected_disable_colors = [int(val) for val in disable_colors or [] if str(val).isdigit()]
+
     params = {
         "color_system": color_system,
         "dither": dither,
         "dark_dither": dark_dither,
         "eight_dot": eight_dot,
         "distance": distance,
+        "no_preprocess": no_preprocess,
+        "weight_h": weight_h,
+        "weight_s": weight_s,
+        "weight_v": weight_v,
+        "weight_r": weight_r,
+        "weight_g": weight_g,
+        "weight_b": weight_b,
+        "posterize": posterize,
+        "saturation": saturation,
+        "gamma": gamma,
+        "contrast": contrast,
+        "hue": hue,
+        "disable_colors": selected_disable_colors,
     }
 
     png_path = None
@@ -194,10 +259,6 @@ def handle_upload(files, color_system, dither, dark_dither, eight_dot, distance,
         enable,
         enable,
         enable,
-        enable,
-        enable,
-        enable,
-        enable,
     )
 
 
@@ -212,7 +273,28 @@ def select_image(evt: gr.SelectData, state: AppState):
     return str(record.orig_path), str(png_path) if png_path else None, record.logs
 
 
-def update_single(color_system, dither, dark_dither, eight_dot, distance, lut_file, state: AppState):
+def update_single(
+    color_system,
+    dither,
+    dark_dither,
+    eight_dot,
+    distance,
+    no_preprocess,
+    weight_h,
+    weight_s,
+    weight_v,
+    weight_r,
+    weight_g,
+    weight_b,
+    posterize,
+    saturation,
+    gamma,
+    contrast,
+    hue,
+    disable_colors,
+    lut_file,
+    state: AppState,
+):
     if not state.images:
         return None, "No images uploaded."
 
@@ -223,12 +305,27 @@ def update_single(color_system, dither, dark_dither, eight_dot, distance, lut_fi
     else:
         state.lut_path = None
 
+    selected_disable_colors = [int(val) for val in disable_colors or [] if str(val).isdigit()]
+
     params = {
         "color_system": color_system,
         "dither": dither,
         "dark_dither": dark_dither,
         "eight_dot": eight_dot,
         "distance": distance,
+        "no_preprocess": no_preprocess,
+        "weight_h": weight_h,
+        "weight_s": weight_s,
+        "weight_v": weight_v,
+        "weight_r": weight_r,
+        "weight_g": weight_g,
+        "weight_b": weight_b,
+        "posterize": posterize,
+        "saturation": saturation,
+        "gamma": gamma,
+        "contrast": contrast,
+        "hue": hue,
+        "disable_colors": selected_disable_colors,
     }
     record = state.current_image()
     if record is None:
@@ -237,7 +334,9 @@ def update_single(color_system, dither, dark_dither, eight_dot, distance, lut_fi
     return str(png_path) if png_path else None, logs
 
 
-def convert_all(params: Dict[str, Optional[str]], state: AppState) -> Tuple[str, List[ImageRecord]]:
+def convert_all(
+    params: Dict[str, Optional[Union[str, bool, float, List[int]]]], state: AppState
+) -> Tuple[str, List[ImageRecord]]:
     logs = []
     if not state.images:
         return "No images to process.", state.images
@@ -249,7 +348,28 @@ def convert_all(params: Dict[str, Optional[str]], state: AppState) -> Tuple[str,
     return "\n\n".join(logs), state.images
 
 
-def batch_run(color_system, dither, dark_dither, eight_dot, distance, lut_file, state: AppState):
+def batch_run(
+    color_system,
+    dither,
+    dark_dither,
+    eight_dot,
+    distance,
+    no_preprocess,
+    weight_h,
+    weight_s,
+    weight_v,
+    weight_r,
+    weight_g,
+    weight_b,
+    posterize,
+    saturation,
+    gamma,
+    contrast,
+    hue,
+    disable_colors,
+    lut_file,
+    state: AppState,
+):
     if lut_file is not None:
         lut_dest = UPLOAD_DIR / f"lut_{uuid.uuid4()}_{Path(lut_file.name).name}"
         shutil.copy(lut_file.name, lut_dest)
@@ -257,12 +377,27 @@ def batch_run(color_system, dither, dark_dither, eight_dot, distance, lut_file, 
     else:
         state.lut_path = None
 
+    selected_disable_colors = [int(val) for val in disable_colors or [] if str(val).isdigit()]
+
     params = {
         "color_system": color_system,
         "dither": dither,
         "dark_dither": dark_dither,
         "eight_dot": eight_dot,
         "distance": distance,
+        "no_preprocess": no_preprocess,
+        "weight_h": weight_h,
+        "weight_s": weight_s,
+        "weight_v": weight_v,
+        "weight_r": weight_r,
+        "weight_g": weight_g,
+        "weight_b": weight_b,
+        "posterize": posterize,
+        "saturation": saturation,
+        "gamma": gamma,
+        "contrast": contrast,
+        "hue": hue,
+        "disable_colors": selected_disable_colors,
     }
     log_text, _ = convert_all(params, state)
     return log_text, gr.update(interactive=True)
@@ -360,9 +495,111 @@ def launch_app():
         state = gr.State(AppState())
 
         gr.Markdown("# MMSXX MSX1 Palette Quantizer for Hugging Face Spaces")
-        with gr.Row():
-            upload = gr.File(label="Upload images (PNG, up to 32)", file_count="multiple", file_types=["image"])
-            lut_upload = gr.File(label="Optional LUT", file_types=[".cube", ".txt", ".lut", ".csv"], file_count="single")
+        upload = gr.File(label="Upload images (PNG, up to 32)", file_count="multiple", file_types=["image"])
+
+        with gr.Accordion("Basic parameters", open=True):
+            color_system = gr.Dropdown(
+                label="Color System",
+                choices=["msx1", "msx2"],
+                value="msx1",
+                info="CLI default is msx1",
+            )
+            with gr.Row():
+                eight_dot = gr.Dropdown(
+                    label="8dot",
+                    choices=["none", "fast", "basic", "best", "best-attr", "best-trans"],
+                    value="best",
+                    info="CLI default is best",
+                )
+                distance = gr.Dropdown(
+                    label="Distance",
+                    choices=["rgb", "hsv"],
+                    value="rgb",
+                    info="CLI default is rgb",
+                )
+            with gr.Row():
+                dither = gr.Checkbox(
+                    label="Dither",
+                    value=True,
+                    info="Default ON (CLI)",
+                )
+                dark_dither = gr.Checkbox(
+                    label="Dark dither",
+                    value=True,
+                    info="Default ON (CLI)",
+                )
+
+        with gr.Accordion("Advanced parameters", open=False):
+            no_preprocess = gr.Checkbox(
+                label="Skip preprocessing (--no-preprocess)",
+                value=False,
+            )
+            gr.Markdown("### Weights")
+            with gr.Row():
+                weight_h = gr.Number(label="HSV weight H", value=None, minimum=0, maximum=1, step=0.01, info="0-1")
+                weight_s = gr.Number(label="HSV weight S", value=None, minimum=0, maximum=1, step=0.01, info="0-1")
+                weight_v = gr.Number(label="HSV weight V", value=None, minimum=0, maximum=1, step=0.01, info="0-1")
+            with gr.Row():
+                weight_r = gr.Number(label="RGB weight R", value=None, minimum=0, maximum=1, step=0.01, info="0-1")
+                weight_g = gr.Number(label="RGB weight G", value=None, minimum=0, maximum=1, step=0.01, info="0-1")
+                weight_b = gr.Number(label="RGB weight B", value=None, minimum=0, maximum=1, step=0.01, info="0-1")
+
+            gr.Markdown("### Preprocess adjustments")
+            with gr.Row():
+                posterize = gr.Number(
+                    label="Posterize before processing",
+                    value=None,
+                    minimum=0,
+                    maximum=255,
+                    step=1,
+                    info="CLI default 16 (ignored if <=1)",
+                )
+                saturation = gr.Number(
+                    label="Pre-saturation",
+                    value=None,
+                    minimum=0,
+                    maximum=10,
+                    step=0.01,
+                    info="CLI default 0.0",
+                )
+            with gr.Row():
+                gamma = gr.Number(
+                    label="Pre-gamma",
+                    value=None,
+                    minimum=0,
+                    maximum=10,
+                    step=0.01,
+                    info="CLI default 1.0",
+                )
+                contrast = gr.Number(
+                    label="Pre-contrast",
+                    value=None,
+                    minimum=0,
+                    maximum=10,
+                    step=0.01,
+                    info="CLI default 1.0",
+                )
+                hue = gr.Number(
+                    label="Pre-hue",
+                    value=None,
+                    minimum=-180,
+                    maximum=180,
+                    step=1,
+                    info="CLI default 0.0",
+                )
+
+            with gr.Accordion("Optional LUT", open=False):
+                lut_upload = gr.File(
+                    label="LUT file (optional)",
+                    file_types=[".cube", ".txt", ".lut", ".csv"],
+                    file_count="single",
+                )
+
+            disable_colors = gr.CheckboxGroup(
+                label="Disable palette colors (1-15)",
+                choices=[(f"Disable color {i}", str(i)) for i in range(1, 16)],
+                value=[],
+            )
 
         with gr.Row():
             gallery = gr.Gallery(label="Images", columns=4, height=200)
@@ -373,43 +610,7 @@ def launch_app():
             with gr.Column():
                 result_preview = gr.Image(label="Converted (PNG)", interactive=False)
 
-        with gr.Accordion("Conversion Parameters", open=True):
-            with gr.Row():
-                color_system = gr.Dropdown(
-                    label="Color System",
-                    choices=["msx1", "msx2"],
-                    value=None,
-                    interactive=False,
-                    info="Leave empty for CLI default",
-                )
-                eight_dot = gr.Dropdown(
-                    label="8dot",
-                    choices=["fast", "basic", "best", "best-attr", "best-trans"],
-                    value=None,
-                    interactive=False,
-                    info="CLI default applies when empty",
-                )
-            with gr.Row():
-                dither = gr.Radio(
-                    label="Dither",
-                    choices=[("CLI default", None), ("Dither", "dither"), ("No dither", "no-dither")],
-                    value=None,
-                    interactive=False,
-                )
-                dark_dither = gr.Radio(
-                    label="Dark dither",
-                    choices=[("CLI default", None), ("Use dark dither", "dark-dither"), ("No dark dither", "no-dark-dither")],
-                    value=None,
-                    interactive=False,
-                )
-            with gr.Row():
-                distance = gr.Dropdown(
-                    label="Distance",
-                    choices=[None, "rgb", "hsv"],
-                    value=None,
-                    interactive=False,
-                    info="Leave empty for CLI default",
-                )
+        with gr.Row():
             update_btn = gr.Button("更新 / Update", variant="primary", interactive=False)
             batch_btn = gr.Button("バッチ実行 / Batch convert", variant="secondary", interactive=False)
 
@@ -431,17 +632,35 @@ def launch_app():
 
         upload.change(
             handle_upload,
-            inputs=[upload, color_system, dither, dark_dither, eight_dot, distance, lut_upload, state],
+            inputs=[
+                upload,
+                color_system,
+                dither,
+                dark_dither,
+                eight_dot,
+                distance,
+                no_preprocess,
+                weight_h,
+                weight_s,
+                weight_v,
+                weight_r,
+                weight_g,
+                weight_b,
+                posterize,
+                saturation,
+                gamma,
+                contrast,
+                hue,
+                disable_colors,
+                lut_upload,
+                state,
+            ],
             outputs=[
                 state,
                 gallery,
                 orig_preview,
                 result_preview,
                 logs_box,
-                color_system,
-                eight_dot,
-                dither,
-                dark_dither,
                 update_btn,
                 batch_btn,
                 download_png,
@@ -457,7 +676,28 @@ def launch_app():
 
         update_btn.click(
             update_single,
-            inputs=[color_system, dither, dark_dither, eight_dot, distance, lut_upload, state],
+            inputs=[
+                color_system,
+                dither,
+                dark_dither,
+                eight_dot,
+                distance,
+                no_preprocess,
+                weight_h,
+                weight_s,
+                weight_v,
+                weight_r,
+                weight_g,
+                weight_b,
+                posterize,
+                saturation,
+                gamma,
+                contrast,
+                hue,
+                disable_colors,
+                lut_upload,
+                state,
+            ],
             outputs=[result_preview, logs_box],
         )
 
@@ -474,7 +714,28 @@ def launch_app():
 
         batch_btn.click(
             batch_run,
-            inputs=[color_system, dither, dark_dither, eight_dot, distance, lut_upload, state],
+            inputs=[
+                color_system,
+                dither,
+                dark_dither,
+                eight_dot,
+                distance,
+                no_preprocess,
+                weight_h,
+                weight_s,
+                weight_v,
+                weight_r,
+                weight_g,
+                weight_b,
+                posterize,
+                saturation,
+                gamma,
+                contrast,
+                hue,
+                disable_colors,
+                lut_upload,
+                state,
+            ],
             outputs=[logs_box, batch_download],
         )
 
