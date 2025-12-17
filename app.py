@@ -1617,6 +1617,39 @@ def launch_app():
                 file_types=["image"],
             )
 
+            with gr.Accordion(t("images_section", default_lang), open=False) as images_section:
+                with gr.Row():
+                    gallery = gr.Gallery(label=t("gallery_label", default_lang), columns=4, height=200)
+
+                with gr.Row():
+                    scale_dropdown = gr.Dropdown(
+                        label=t("scale_label", default_lang),
+                        choices=["1", "2", "3", "4"],
+                        value="2",
+                        elem_id="preview-scale",
+                        allow_custom_value=True,
+                    )
+
+                with gr.Row():
+                    with gr.Column():
+                        orig_preview = gr.Image(
+                            label=t("orig_label", default_lang),
+                            interactive=False,
+                            elem_classes=["preview-scale-wrapper"],
+                        )
+                    with gr.Column():
+                        result_preview = gr.Image(
+                            label=t("result_label", default_lang),
+                            interactive=False,
+                            elem_classes=["preview-scale-wrapper"],
+                        )
+
+                with gr.Row():
+                    update_btn = gr.Button(t("update_button", default_lang), variant="primary", interactive=False)
+                    batch_btn = gr.Button(t("batch_button", default_lang), variant="secondary", interactive=False)
+                    download_png = gr.DownloadButton(label=t("download_png", default_lang), interactive=False)
+                    download_sc2 = gr.DownloadButton(label=t("download_sc2", default_lang), interactive=False)
+
         with gr.Accordion(t("preprocess_section", default_lang), open=False) as preprocess_section:
             with gr.Row():
                 preprocessing = gr.Checkbox(
@@ -1781,37 +1814,6 @@ def launch_app():
                 settings_download = gr.DownloadButton(label=t("settings_export", default_lang))
                 settings_save_browser = gr.Button(t("settings_save_browser", default_lang))
                 settings_clear_browser = gr.Button(t("settings_clear_browser", default_lang))
-
-        with gr.Accordion(t("images_section", default_lang), open=False) as images_section:
-            with gr.Row():
-                gallery = gr.Gallery(label=t("gallery_label", default_lang), columns=4, height=200)
-
-            with gr.Row():
-                scale_dropdown = gr.Dropdown(
-                    label=t("scale_label", default_lang),
-                    choices=["1", "2", "3", "4"],
-                    value="2",
-                    elem_id="preview-scale",
-                    allow_custom_value=False,
-                )
-
-            with gr.Row():
-                with gr.Column():
-                    orig_preview = gr.Image(
-                        label=t("orig_label", default_lang), interactive=False, elem_classes=["preview-scale-wrapper"]
-                    )
-                with gr.Column():
-                    result_preview = gr.Image(
-                        label=t("result_label", default_lang), interactive=False, elem_classes=["preview-scale-wrapper"]
-                    )
-
-        with gr.Row():
-            update_btn = gr.Button(t("update_button", default_lang), variant="primary", interactive=False)
-            batch_btn = gr.Button(t("batch_button", default_lang), variant="secondary", interactive=False)
-
-        with gr.Row():
-            download_png = gr.DownloadButton(label=t("download_png", default_lang), interactive=False)
-            download_sc2 = gr.DownloadButton(label=t("download_sc2", default_lang), interactive=False)
 
         with gr.Accordion(t("batch_section", default_lang), open=True) as batch_section:
             batch_type = gr.Radio(
