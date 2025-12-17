@@ -142,33 +142,100 @@ class SettingProfile:
 
 
 class SettingManager:
-    def __init__(self, profiles: List[SettingProfile]):
+    BOOL_KEYS = {"dither", "dark_dither", "preprocess"}
+    NUMERIC_KEYS = {
+        "posterize",
+        "saturation",
+        "gamma",
+        "contrast",
+        "hue",
+        "weight_h",
+        "weight_s",
+        "weight_v",
+        "weight_r",
+        "weight_g",
+        "weight_b",
+    }
+    LIST_KEYS = {"use_colors"}
+    STRING_KEYS = {"color_system", "eight_dot", "distance"}
+    KNOWN_KEYS = BOOL_KEYS | NUMERIC_KEYS | LIST_KEYS | STRING_KEYS
+
+    def __init__(self, profiles: List[SettingProfile], errors: Optional[List[str]] = None):
         self.profiles = profiles
         self.profile_map = {profile.key: profile for profile in profiles}
+        self.errors = errors or []
 
     @classmethod
     def from_file(cls, path: Path) -> "SettingManager":
+        errors: List[str] = []
         data = json.loads(path.read_text(encoding="utf-8"))
         version = data.get("format_version", 1)
         if version != SETTINGS_FORMAT_VERSION:
-            raise ValueError(
-                f"Unsupported settings format version: {version} (expected {SETTINGS_FORMAT_VERSION})"
+            errors.append(
+                f"Unsupported settings format version: {version} (expected {SETTINGS_FORMAT_VERSION}). Continuing with available data."
             )
 
         profiles: List[SettingProfile] = []
-        for raw in data.get("profiles", []):
+        for idx, raw in enumerate(data.get("profiles", [])):
             if raw.get("enabled", True) is False:
                 continue
+            values = cls._sanitize_values(raw.get("values", {}), errors, raw.get("name") or f"Profile {idx + 1}")
             profiles.append(
                 SettingProfile(
                     key=raw.get("key", ""),
                     name=raw.get("name", ""),
                     description=raw.get("description", ""),
-                    values=raw.get("values", {}),
+                    values=values,
                     enabled=raw.get("enabled", True),
                 )
             )
-        return cls(profiles)
+        return cls(profiles, errors)
+
+    @classmethod
+    def _sanitize_values(
+        cls, values: Dict[str, Union[str, bool, float, List[Union[str, int]]]], errors: List[str], profile_name: str
+    ) -> Dict[str, Union[str, bool, float, List[Union[str, int]], None]]:
+        if not isinstance(values, dict):
+            errors.append(f"[{profile_name}] Values must be an object. Ignoring provided values.")
+            return {}
+
+        sanitized: Dict[str, Union[str, bool, float, List[Union[str, int]], None]] = {}
+        for key, val in values.items():
+            if key not in cls.KNOWN_KEYS:
+                errors.append(f"[{profile_name}] Unknown parameter '{key}' was ignored.")
+                continue
+
+            if val is None:
+                sanitized[key] = None
+                continue
+
+            if key in cls.BOOL_KEYS:
+                if isinstance(val, bool):
+                    sanitized[key] = val
+                else:
+                    errors.append(f"[{profile_name}] '{key}' expects a boolean. Value '{val}' was skipped.")
+            elif key in cls.NUMERIC_KEYS:
+                try:
+                    sanitized[key] = int(val) if key == "posterize" else float(val)
+                except (TypeError, ValueError):
+                    errors.append(f"[{profile_name}] '{key}' expects a number. Value '{val}' was skipped.")
+            elif key in cls.LIST_KEYS:
+                if isinstance(val, list):
+                    cleaned: List[int] = []
+                    for idx, item in enumerate(val):
+                        try:
+                            cleaned.append(int(item))
+                        except (TypeError, ValueError):
+                            errors.append(
+                                f"[{profile_name}] '{key}' entry at position {idx} is not a number ('{item}') and was skipped."
+                            )
+                    sanitized[key] = cleaned or None
+                else:
+                    errors.append(f"[{profile_name}] '{key}' expects a list. Value '{val}' was skipped.")
+            else:
+                sanitized[key] = str(val)
+
+        return sanitized
 
     def get_profile(self, key: str) -> Optional[SettingProfile]:
         return self.profile_map.get(key)
@@ -324,18 +391,30 @@ def profile_value(values: Dict[str, Union[str, bool, float, List[Union[str, int]
     return values.get(key)
 
 
+def append_log(log_text: str, level: str, message: str) -> str:
+    prefix = "[ERROR]" if level == "error" else "[INFO]"
+    line = f"{prefix} {message}"
+    if not log_text:
+        return line
+    return f"{log_text.rstrip()}\n{line}"
+
+
 def render_overlay(message: Optional[str], level: str = "info") -> str:
     if not message:
         return ""
     level_class = "overlay-error" if level == "error" else "overlay-info"
     icon = "⚠️" if level == "error" else "ℹ️"
+    overlay_id = f"overlay-{uuid.uuid4().hex}"
     safe_message = html.escape(message)
     return (
-        "<div class=\"overlay-container\">"
+        f"<div id=\"{overlay_id}\" class=\"overlay-container\" data-level=\"{level}\">"
         f"<div class=\"overlay-card {level_class}\">"
         f"<span class=\"overlay-icon\">{icon}</span>"
         f"<span>{safe_message}</span>"
         "</div></div>"
+        f"<script>(() => {{const el = document.getElementById('{overlay_id}');if(!el) return;"
+        "const close=() => el.remove();el.addEventListener('click', close);"
+        f"if('{level}' !== 'error'){{setTimeout(close, 5000);}}}})();</script>"
     )
 
 
@@ -787,10 +866,11 @@ def change_language(lang: str, state: AppState):
     )
 
 
-def apply_profile(profile_key: str, state: AppState):
+def apply_profile(profile_key: str, state: AppState, logs_text: str):
     profile = SETTINGS_MANAGER.get_profile(profile_key) or SETTINGS_MANAGER.default_profile
     state.profile_key = profile.key
     values = SETTINGS_MANAGER.values_for(profile)
+    message = f"{t('profile_loaded', state.language)}: {profile.name}"
     return (
         state,
         profile_summary(profile),
@@ -812,7 +892,8 @@ def apply_profile(profile_key: str, state: AppState):
         gr.update(value=profile_value(values, "weight_g", 1.0)),
         gr.update(value=profile_value(values, "weight_b", 1.0)),
         gr.update(value=to_use_colors(values.get("use_colors"))),
-        overlay_update(f"{t('profile_loaded', state.language)}: {profile.name}", "info"),
+        overlay_update(message, "info"),
+        gr.update(value=append_log(logs_text, "info", message)),
     )
 
 
@@ -925,7 +1006,8 @@ def launch_app():
                 value=default_lang,
             )
 
-        overlay_box = gr.HTML(value="", show_label=False)
+        initial_overlay = render_overlay("; ".join(SETTINGS_MANAGER.errors), "error") if SETTINGS_MANAGER.errors else ""
+        overlay_box = gr.HTML(value=initial_overlay, show_label=False)
 
         heading = gr.Markdown(t("heading_title", default_lang))
 
@@ -1113,7 +1195,10 @@ def launch_app():
             batch_download = gr.DownloadButton(label=t("batch_download", default_lang), interactive=False)
             batch_message = gr.Textbox(label=t("batch_status", default_lang), interactive=False)
 
-        logs_box = gr.Textbox(label=t("logs", default_lang), lines=10, interactive=False)
+        initial_logs = ""
+        for err in SETTINGS_MANAGER.errors:
+            initial_logs = append_log(initial_logs, "error", err)
+        logs_box = gr.Textbox(label=t("logs", default_lang), lines=10, interactive=False, value=initial_logs)
 
         upload.change(
             handle_upload,
@@ -1238,7 +1323,7 @@ def launch_app():
 
         settings_selector.change(
             apply_profile,
-            inputs=[settings_selector, state],
+            inputs=[settings_selector, state, logs_box],
             outputs=[
                 state,
                 profile_label,
@@ -1261,6 +1346,7 @@ def launch_app():
                 weight_b,
                 use_colors,
                 overlay_box,
+                logs_box,
             ],
         )
 
