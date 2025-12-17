@@ -943,7 +943,7 @@ def launch_app():
                     value=profile_value(default_values, "preprocess", True),
                     info=t("preprocessing_info", default_lang),
                 )
-                posterize = gr.Number(
+                posterize = gr.Slider(
                     label=t("posterize_label", default_lang),
                     value=profile_value(default_values, "posterize", 16),
                     minimum=0,
@@ -951,7 +951,7 @@ def launch_app():
                     step=1,
                     info=t("posterize_info", default_lang),
                 )
-                saturation = gr.Number(
+                saturation = gr.Slider(
                     label=t("saturation_label", default_lang),
                     value=profile_value(default_values, "saturation", 0.0),
                     minimum=0,
@@ -959,7 +959,7 @@ def launch_app():
                     step=0.01,
                     info=t("saturation_info", default_lang),
                 )
-                gamma = gr.Number(
+                gamma = gr.Slider(
                     label=t("gamma_label", default_lang),
                     value=profile_value(default_values, "gamma", 1.0),
                     minimum=0,
@@ -967,7 +967,7 @@ def launch_app():
                     step=0.01,
                     info=t("gamma_info", default_lang),
                 )
-                contrast = gr.Number(
+                contrast = gr.Slider(
                     label=t("contrast_label", default_lang),
                     value=profile_value(default_values, "contrast", 1.0),
                     minimum=0,
@@ -975,7 +975,7 @@ def launch_app():
                     step=0.01,
                     info=t("contrast_info", default_lang),
                 )
-                hue = gr.Number(
+                hue = gr.Slider(
                     label=t("hue_label", default_lang),
                     value=profile_value(default_values, "hue", 0.0),
                     minimum=-180,
@@ -1024,7 +1024,7 @@ def launch_app():
 
             with gr.Accordion(t("weights_section", default_lang), open=False) as weights_section:
                 with gr.Row():
-                    weight_h = gr.Number(
+                    weight_h = gr.Slider(
                         label=t("weight_h_label", default_lang),
                         value=profile_value(default_values, "weight_h", 1.0),
                         minimum=0,
@@ -1032,7 +1032,7 @@ def launch_app():
                         step=0.01,
                         info=t("weight_info", default_lang),
                     )
-                    weight_s = gr.Number(
+                    weight_s = gr.Slider(
                         label=t("weight_s_label", default_lang),
                         value=profile_value(default_values, "weight_s", 1.0),
                         minimum=0,
@@ -1040,7 +1040,7 @@ def launch_app():
                         step=0.01,
                         info=t("weight_info", default_lang),
                     )
-                    weight_v = gr.Number(
+                    weight_v = gr.Slider(
                         label=t("weight_v_label", default_lang),
                         value=profile_value(default_values, "weight_v", 1.0),
                         minimum=0,
@@ -1049,7 +1049,7 @@ def launch_app():
                         info=t("weight_info", default_lang),
                     )
                 with gr.Row():
-                    weight_r = gr.Number(
+                    weight_r = gr.Slider(
                         label=t("weight_r_label", default_lang),
                         value=profile_value(default_values, "weight_r", 1.0),
                         minimum=0,
@@ -1057,7 +1057,7 @@ def launch_app():
                         step=0.01,
                         info=t("weight_info", default_lang),
                     )
-                    weight_g = gr.Number(
+                    weight_g = gr.Slider(
                         label=t("weight_g_label", default_lang),
                         value=profile_value(default_values, "weight_g", 1.0),
                         minimum=0,
@@ -1065,7 +1065,7 @@ def launch_app():
                         step=0.01,
                         info=t("weight_info", default_lang),
                     )
-                    weight_b = gr.Number(
+                    weight_b = gr.Slider(
                         label=t("weight_b_label", default_lang),
                         value=profile_value(default_values, "weight_b", 1.0),
                         minimum=0,
