@@ -42,21 +42,50 @@ PALETTE_COLORS: List[Tuple[int, int, int]] = [
     (255, 255, 255),
 ]
 
-CUSTOM_CSS = """
-.palette-choice {
+def palette_text_color(r: int, g: int, b: int) -> str:
+    luminance = 0.299 * r + 0.587 * g + 0.114 * b
+    return "#FFFFFF" if luminance < 140 else "#000000"
+
+
+def build_palette_css() -> str:
+    base_css = """
+.palette-checkboxes label {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-weight: 600;
+    transition: filter 0.15s ease;
 }
 
-.palette-swatch {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border: 1px solid #00000066;
-    box-sizing: border-box;
+.palette-checkboxes label:hover {
+    filter: brightness(0.95);
+}
+
+.palette-checkboxes input[type='checkbox'] {
+    accent-color: currentColor;
 }
 """
+    color_blocks = []
+    for idx, (r, g, b) in enumerate(PALETTE_COLORS, start=1):
+        text_color = palette_text_color(r, g, b)
+        color_blocks.append(
+            f"""
+.palette-checkboxes label:has(input[value=\"{idx}\"]) {{
+    background: rgb({r}, {g}, {b});
+    color: {text_color};
+}}
+
+.palette-checkboxes label:has(input[value=\"{idx}\"]) * {
+    color: {text_color};
+}
+"""
+        )
+    return base_css + "\n".join(color_blocks)
+
+
+CUSTOM_CSS = build_palette_css()
 
 I18N = {
     "heading_title": {
@@ -64,6 +93,11 @@ I18N = {
         "ja": "# MMSXX MSX1 Palette Quantizer for Hugging Face Spaces",
     },
     "heading_basic": {"en": "### BASIC Parameters", "ja": "### BASICパラメーターズ"},
+    "upload_section": {"en": "Upload images", "ja": "画像アップロード"},
+    "images_section": {
+        "en": "Images and results",
+        "ja": "画像一覧と変換結果",
+    },
     "language_label": {"en": "Language", "ja": "言語"},
     "color_system_label": {"en": "Color System", "ja": "カラーシステム"},
     "color_system_info": {"en": "CLI default is msx1", "ja": "CLI デフォルトは msx1"},
@@ -162,12 +196,7 @@ def t(key: str, lang: str) -> str:
 
 
 def palette_choices(lang: str) -> List[Tuple[str, str]]:
-    choices: List[Tuple[str, str]] = []
-    for i, (r, g, b) in enumerate(PALETTE_COLORS, start=1):
-        swatch = f"<span class='palette-swatch' style='background: rgb({r}, {g}, {b});'></span>"
-        label = f"<span class='palette-choice'>{swatch}<span>#{i}</span></span>"
-        choices.append((label, str(i)))
-    return choices
+    return [(f"#{i}", str(i)) for i in range(1, len(PALETTE_COLORS) + 1)]
 
 
 def ensure_executables() -> None:
@@ -360,6 +389,8 @@ def handle_upload(
             disable,
             disable,
             disable,
+            gr.update(open=True),
+            gr.update(open=False),
         )
 
     state.images = save_uploads(files)
@@ -411,6 +442,8 @@ def handle_upload(
         enable,
         enable,
         enable,
+        gr.update(open=False),
+        gr.update(open=True),
     )
 
 
@@ -567,12 +600,8 @@ def change_language(lang: str, state: AppState):
     return (
         state,
         gr.update(value=t("heading_title", lang)),
-        gr.update(value=t("heading_basic", lang)),
-        gr.update(label=t("color_system_label", lang), info=t("color_system_info", lang)),
-        gr.update(label=t("eight_dot_label", lang), info=t("eight_dot_info", lang)),
-        gr.update(label=t("distance_label", lang), info=t("distance_info", lang)),
-        gr.update(label=t("dither_label", lang), info=t("dither_info", lang)),
-        gr.update(label=t("dark_dither_label", lang), info=t("dark_dither_info", lang)),
+        gr.update(label=t("upload_section", lang)),
+        gr.update(label=t("upload_label", lang)),
         gr.update(label=t("preprocess_section", lang)),
         gr.update(label=t("preprocessing_label", lang), info=t("preprocessing_info", lang)),
         gr.update(label=t("posterize_label", lang), info=t("posterize_info", lang)),
@@ -582,6 +611,12 @@ def change_language(lang: str, state: AppState):
         gr.update(label=t("hue_label", lang), info=t("hue_info", lang)),
         gr.update(label=t("lut_section", lang)),
         gr.update(label=t("lut_label", lang)),
+        gr.update(label=t("heading_basic", lang)),
+        gr.update(label=t("color_system_label", lang), info=t("color_system_info", lang)),
+        gr.update(label=t("eight_dot_label", lang), info=t("eight_dot_info", lang)),
+        gr.update(label=t("distance_label", lang), info=t("distance_info", lang)),
+        gr.update(label=t("dither_label", lang), info=t("dither_info", lang)),
+        gr.update(label=t("dark_dither_label", lang), info=t("dark_dither_info", lang)),
         gr.update(label=t("weights_section", lang)),
         gr.update(label=t("weight_h_label", lang), info=t("weight_info", lang)),
         gr.update(label=t("weight_s_label", lang), info=t("weight_info", lang)),
@@ -590,7 +625,7 @@ def change_language(lang: str, state: AppState):
         gr.update(label=t("weight_g_label", lang), info=t("weight_info", lang)),
         gr.update(label=t("weight_b_label", lang), info=t("weight_info", lang)),
         gr.update(label=t("palette_label", lang), choices=palette),
-        gr.update(label=t("upload_label", lang)),
+        gr.update(label=t("images_section", lang)),
         gr.update(label=t("gallery_label", lang)),
         gr.update(label=t("orig_label", lang)),
         gr.update(label=t("result_label", lang)),
@@ -709,35 +744,11 @@ def launch_app():
 
         heading = gr.Markdown(t("heading_title", default_lang))
 
-        basic_heading = gr.Markdown(t("heading_basic", default_lang))
-        with gr.Row():
-            color_system = gr.Dropdown(
-                label=t("color_system_label", default_lang),
-                choices=["msx1", "msx2"],
-                value="msx1",
-                info=t("color_system_info", default_lang),
-            )
-            eight_dot = gr.Dropdown(
-                label=t("eight_dot_label", default_lang),
-                choices=["none", "fast", "basic", "best", "best-attr", "best-trans"],
-                value="best",
-                info=t("eight_dot_info", default_lang),
-            )
-            distance = gr.Dropdown(
-                label=t("distance_label", default_lang),
-                choices=["rgb", "hsv"],
-                value="rgb",
-                info=t("distance_info", default_lang),
-            )
-            dither = gr.Checkbox(
-                label=t("dither_label", default_lang),
-                value=True,
-                info=t("dither_info", default_lang),
-            )
-            dark_dither = gr.Checkbox(
-                label=t("dark_dither_label", default_lang),
-                value=True,
-                info=t("dark_dither_info", default_lang),
+        with gr.Accordion(t("upload_section", default_lang), open=True) as upload_section:
+            upload = gr.File(
+                label=t("upload_label", default_lang),
+                file_count="multiple",
+                file_types=["image"],
             )
 
         with gr.Accordion(t("preprocess_section", default_lang), open=False) as preprocess_section:
@@ -795,78 +806,105 @@ def launch_app():
                     file_count="single",
                 )
 
-        with gr.Accordion(t("weights_section", default_lang), open=False) as weights_section:
+        with gr.Accordion(t("heading_basic", default_lang), open=True) as basic_section:
             with gr.Row():
-                weight_h = gr.Number(
-                    label=t("weight_h_label", default_lang),
-                    value=1.0,
-                    minimum=0,
-                    maximum=1,
-                    step=0.01,
-                    info=t("weight_info", default_lang),
+                color_system = gr.Dropdown(
+                    label=t("color_system_label", default_lang),
+                    choices=["msx1", "msx2"],
+                    value="msx1",
+                    info=t("color_system_info", default_lang),
                 )
-                weight_s = gr.Number(
-                    label=t("weight_s_label", default_lang),
-                    value=1.0,
-                    minimum=0,
-                    maximum=1,
-                    step=0.01,
-                    info=t("weight_info", default_lang),
+                eight_dot = gr.Dropdown(
+                    label=t("eight_dot_label", default_lang),
+                    choices=["none", "fast", "basic", "best", "best-attr", "best-trans"],
+                    value="best",
+                    info=t("eight_dot_info", default_lang),
                 )
-                weight_v = gr.Number(
-                    label=t("weight_v_label", default_lang),
-                    value=1.0,
-                    minimum=0,
-                    maximum=1,
-                    step=0.01,
-                    info=t("weight_info", default_lang),
+                distance = gr.Dropdown(
+                    label=t("distance_label", default_lang),
+                    choices=["rgb", "hsv"],
+                    value="rgb",
+                    info=t("distance_info", default_lang),
                 )
+                dither = gr.Checkbox(
+                    label=t("dither_label", default_lang),
+                    value=True,
+                    info=t("dither_info", default_lang),
+                )
+                dark_dither = gr.Checkbox(
+                    label=t("dark_dither_label", default_lang),
+                    value=True,
+                    info=t("dark_dither_info", default_lang),
+                )
+
+            with gr.Accordion(t("weights_section", default_lang), open=False) as weights_section:
+                with gr.Row():
+                    weight_h = gr.Number(
+                        label=t("weight_h_label", default_lang),
+                        value=1.0,
+                        minimum=0,
+                        maximum=1,
+                        step=0.01,
+                        info=t("weight_info", default_lang),
+                    )
+                    weight_s = gr.Number(
+                        label=t("weight_s_label", default_lang),
+                        value=1.0,
+                        minimum=0,
+                        maximum=1,
+                        step=0.01,
+                        info=t("weight_info", default_lang),
+                    )
+                    weight_v = gr.Number(
+                        label=t("weight_v_label", default_lang),
+                        value=1.0,
+                        minimum=0,
+                        maximum=1,
+                        step=0.01,
+                        info=t("weight_info", default_lang),
+                    )
+                with gr.Row():
+                    weight_r = gr.Number(
+                        label=t("weight_r_label", default_lang),
+                        value=1.0,
+                        minimum=0,
+                        maximum=1,
+                        step=0.01,
+                        info=t("weight_info", default_lang),
+                    )
+                    weight_g = gr.Number(
+                        label=t("weight_g_label", default_lang),
+                        value=1.0,
+                        minimum=0,
+                        maximum=1,
+                        step=0.01,
+                        info=t("weight_info", default_lang),
+                    )
+                    weight_b = gr.Number(
+                        label=t("weight_b_label", default_lang),
+                        value=1.0,
+                        minimum=0,
+                        maximum=1,
+                        step=0.01,
+                        info=t("weight_info", default_lang),
+                    )
+
+            use_colors = gr.CheckboxGroup(
+                label=t("palette_label", default_lang),
+                choices=palette_choices(default_lang),
+                value=COLOR_CHOICES,
+                elem_classes=["palette-checkboxes"],
+            )
+
+        with gr.Accordion(t("images_section", default_lang), open=False) as images_section:
             with gr.Row():
-                weight_r = gr.Number(
-                    label=t("weight_r_label", default_lang),
-                    value=1.0,
-                    minimum=0,
-                    maximum=1,
-                    step=0.01,
-                    info=t("weight_info", default_lang),
-                )
-                weight_g = gr.Number(
-                    label=t("weight_g_label", default_lang),
-                    value=1.0,
-                    minimum=0,
-                    maximum=1,
-                    step=0.01,
-                    info=t("weight_info", default_lang),
-                )
-                weight_b = gr.Number(
-                    label=t("weight_b_label", default_lang),
-                    value=1.0,
-                    minimum=0,
-                    maximum=1,
-                    step=0.01,
-                    info=t("weight_info", default_lang),
-                )
+                gallery = gr.Gallery(label=t("gallery_label", default_lang), columns=4, height=200)
 
-        use_colors = gr.CheckboxGroup(
-            label=t("palette_label", default_lang),
-            choices=palette_choices(default_lang),
-            value=COLOR_CHOICES,
-        )
-
-        upload = gr.File(
-            label=t("upload_label", default_lang),
-            file_count="multiple",
-            file_types=["image"],
-        )
-
-        with gr.Row():
-            gallery = gr.Gallery(label=t("gallery_label", default_lang), columns=4, height=200)
-
-        with gr.Row():
-            with gr.Column():
-                orig_preview = gr.Image(label=t("orig_label", default_lang), interactive=False)
-            with gr.Column():
-                result_preview = gr.Image(label=t("result_label", default_lang), interactive=False)
+            with gr.Row():
+                with gr.Column():
+                    orig_preview = gr.Image(label=t("orig_label", default_lang), interactive=False)
+                with gr.Column():
+                    result_preview = gr.Image(label=t("result_label", default_lang), interactive=False)
 
         with gr.Row():
             update_btn = gr.Button(t("update_button", default_lang), variant="primary", interactive=False)
@@ -927,6 +965,8 @@ def launch_app():
                 batch_btn,
                 download_png,
                 download_sc2,
+                upload_section,
+                images_section,
             ],
         )
 
@@ -1017,12 +1057,8 @@ def launch_app():
             outputs=[
                 state,
                 heading,
-                basic_heading,
-                color_system,
-                eight_dot,
-                distance,
-                dither,
-                dark_dither,
+                upload_section,
+                upload,
                 preprocess_section,
                 preprocessing,
                 posterize,
@@ -1032,6 +1068,12 @@ def launch_app():
                 hue,
                 lut_section,
                 lut_upload,
+                basic_section,
+                color_system,
+                eight_dot,
+                distance,
+                dither,
+                dark_dither,
                 weights_section,
                 weight_h,
                 weight_s,
@@ -1040,7 +1082,7 @@ def launch_app():
                 weight_g,
                 weight_b,
                 use_colors,
-                upload,
+                images_section,
                 gallery,
                 orig_preview,
                 result_preview,
