@@ -132,10 +132,16 @@ LOCAL_STORAGE_BRIDGE = """
 <script>
 (() => {
   const KEY = "msx1pq_settings_json";
+  let lastValue = null;
   const findInput = () => {
     const root = gradioApp();
     if (!root) return null;
     return root.querySelector("#local-settings-json textarea, #local-settings-json input");
+  };
+
+  const persist = (value) => {
+    lastValue = value;
+    window.localStorage.setItem(KEY, value || "");
   };
 
   const sync = () => {
@@ -147,15 +153,26 @@ LOCAL_STORAGE_BRIDGE = """
       el.value = saved;
       el.dispatchEvent(new Event("input", { bubbles: true }));
       el.dispatchEvent(new Event("change", { bubbles: true }));
+      persist(saved);
     }
     el.addEventListener("input", () => {
-      window.localStorage.setItem(KEY, el.value || "");
+      persist(el.value);
     });
   };
 
   const observer = new MutationObserver(sync);
   observer.observe(document.documentElement, { childList: true, subtree: true });
   sync();
+
+  if (!window.__msx1pq_settings_watchdog) {
+    window.__msx1pq_settings_watchdog = setInterval(() => {
+      const el = findInput();
+      if (!el) return;
+      if (el.value !== lastValue) {
+        persist(el.value);
+      }
+    }, 500);
+  }
 })();
 </script>
 """
@@ -198,10 +215,30 @@ class SettingManager:
         errors: Optional[List[str]] = None,
         profile_errors: Optional[Dict[str, List[str]]] = None,
     ):
-        self.profiles = profiles or [SettingProfile("default", "Default", "", {}, True)]
+        base_profiles = profiles or [SettingProfile("default", "Default", "", {}, True)]
+        normalized_profiles, key_map = self._normalize_profiles(base_profiles)
+        self.profiles = normalized_profiles
         self.profile_map = {profile.key: profile for profile in self.profiles}
         self.global_errors = errors or []
-        self.profile_errors = profile_errors or {}
+        raw_profile_errors = profile_errors or {}
+        self.profile_errors = {key_map.get(key, key): val for key, val in raw_profile_errors.items()}
+
+    def _normalize_profiles(self, profiles: List[SettingProfile]) -> Tuple[List[SettingProfile], Dict[str, str]]:
+        normalized: Dict[str, SettingProfile] = {}
+        key_map: Dict[str, str] = {}
+
+        for idx, profile in enumerate(profiles):
+            original_key = profile.key
+            base_key = profile.key
+            if base_key != "default":
+                base_key = (profile.name or "").strip() or profile.key
+            if not base_key:
+                base_key = f"profile-{idx}"
+            profile.key = base_key
+            normalized[base_key] = profile
+            key_map[original_key] = base_key
+
+        return list(normalized.values()), key_map
 
     @classmethod
     def from_file(cls, path: Path) -> "SettingManager":
@@ -456,8 +493,11 @@ I18N = {
     "profile_loaded": {"en": "Profile loaded.", "ja": "設定を読み込みました。"},
     "settings_title": {"en": "Profile title", "ja": "設定タイトル"},
     "settings_description": {"en": "Profile description", "ja": "設定説明"},
+    "settings_group": {"en": "Settings", "ja": "設定"},
+    "settings_set": {"en": "Settings set", "ja": "設定セット"},
     "settings_import": {"en": "Load settings (JSON)", "ja": "設定を読み込む (JSON)"},
     "settings_export": {"en": "Export settings (JSON)", "ja": "設定を書き出す (JSON)"},
+    "settings_save_browser": {"en": "Save settings to browser", "ja": "設定をブラウザに保存"},
     "settings_loaded": {"en": "Settings loaded.", "ja": "設定を読み込みました。"},
     "settings_saved": {"en": "Settings saved to browser.", "ja": "設定をブラウザに保存しました。"},
     "profile_updated": {"en": "Profile title/description updated.", "ja": "設定のタイトルと説明を更新しました。"},
@@ -471,10 +511,6 @@ def t(key: str, lang: str) -> str:
 
 def palette_choices(lang: str) -> List[Tuple[str, str]]:
     return [(f"#{i}", str(i)) for i in range(1, len(PALETTE_COLORS) + 1)]
-
-
-def profile_summary(profile: SettingProfile) -> str:
-    return f"**{profile.name}** — {profile.description}"
 
 
 def to_use_colors(value: Optional[List[Union[str, int]]]) -> List[str]:
@@ -926,10 +962,13 @@ def change_language(lang: str, state: AppState):
     return (
         state,
         gr.update(value=t("heading_title", lang)),
+        gr.update(label=t("settings_group", lang)),
+        gr.update(label=t("settings_set", lang)),
         gr.update(label=t("settings_title", lang)),
         gr.update(label=t("settings_description", lang)),
         gr.update(label=t("settings_import", lang)),
         gr.update(label=t("settings_export", lang)),
+        gr.update(value=t("settings_save_browser", lang)),
         gr.update(label=t("upload_section", lang)),
         gr.update(label=t("upload_label", lang)),
         gr.update(label=t("preprocess_section", lang)),
@@ -993,7 +1032,6 @@ def build_profile_outputs(
 
     return (
         state,
-        profile_summary(profile),
         gr.update(value=profile.name),
         gr.update(value=profile.description),
         gr.update(value=profile_value(values, "color_system", "msx1")),
@@ -1088,6 +1126,9 @@ def load_settings_from_text(raw_text: str, state: AppState, logs_text: str):
 
 
 def load_settings_file(file: Optional[gr.File], state: AppState, logs_text: str):
+    if isinstance(file, list):
+        file = file[0] if file else None
+
     if file is None:
         current_profile = SETTINGS_MANAGER.get_profile(state.profile_key) or SETTINGS_MANAGER.default_profile
         outputs = build_profile_outputs(current_profile, state, logs_text)
@@ -1134,6 +1175,11 @@ def export_settings(state: AppState, logs_text: str):
     export_path.write_text(current_settings_json(), encoding="utf-8")
     logs = append_log(logs_text, "info", t("settings_saved", state.language))
     return str(export_path), overlay_update(t("settings_saved", state.language), "info"), gr.update(value=logs), gr.update(value=current_settings_json())
+
+
+def save_settings_to_browser(state: AppState, logs_text: str):
+    logs = append_log(logs_text, "info", t("settings_saved", state.language))
+    return overlay_update(t("settings_saved", state.language), "info"), gr.update(value=logs), gr.update(value=current_settings_json())
 
 
 def zip_files(file_paths: List[Path], zip_name: str) -> Path:
@@ -1232,28 +1278,12 @@ def launch_app():
         state = gr.State(AppState(language=default_lang, profile_key=default_profile.key))
 
         with gr.Row():
-            settings_selector = gr.Dropdown(
-                label="設定セット",
-                choices=SETTINGS_MANAGER.choices,
-                value=default_profile.key,
-            )
-            profile_label = gr.Markdown(profile_summary(default_profile))
             language_selector = gr.Dropdown(
                 label="",
                 show_label=False,
                 choices=[("lang:ja", "ja"), ("lang:en", "en")],
                 value=default_lang,
             )
-
-        with gr.Row():
-            profile_title = gr.Textbox(label=t("settings_title", default_lang), value=default_profile.name)
-            profile_description = gr.Textbox(
-                label=t("settings_description", default_lang), value=default_profile.description
-            )
-
-        with gr.Row():
-            settings_file = gr.File(label=t("settings_import", default_lang), file_types=[".json"], file_count="single")
-            settings_download = gr.DownloadButton(label=t("settings_export", default_lang))
 
         settings_storage = gr.Textbox(value=current_settings_json(), visible=False, elem_id="local-settings-json")
         storage_helper = gr.HTML(value=LOCAL_STORAGE_BRIDGE, visible=False)
@@ -1416,6 +1446,28 @@ def launch_app():
             value=to_use_colors(default_values.get("use_colors")),
             elem_classes=["palette-checkboxes"],
         )
+
+        with gr.Accordion(t("settings_group", default_lang), open=False) as settings_section:
+            settings_selector = gr.Dropdown(
+                label=t("settings_set", default_lang),
+                choices=SETTINGS_MANAGER.choices,
+                value=default_profile.key,
+            )
+            with gr.Row():
+                profile_title = gr.Textbox(label=t("settings_title", default_lang), value=default_profile.name)
+                profile_description = gr.Textbox(
+                    label=t("settings_description", default_lang), value=default_profile.description
+                )
+            with gr.Row():
+                settings_file = gr.UploadButton(
+                    label=t("settings_import", default_lang),
+                    file_types=[".json"],
+                    file_count="single",
+                )
+                settings_download = gr.DownloadButton(
+                    label=t("settings_export", default_lang), file_name="settings.json"
+                )
+                settings_save_browser = gr.Button(t("settings_save_browser", default_lang))
 
         with gr.Accordion(t("images_section", default_lang), open=False) as images_section:
             with gr.Row():
@@ -1580,7 +1632,6 @@ def launch_app():
             inputs=[settings_selector, state, logs_box],
             outputs=[
                 state,
-                profile_label,
                 profile_title,
                 profile_description,
                 color_system,
@@ -1606,13 +1657,12 @@ def launch_app():
             ],
         )
 
-        settings_file.change(
+        settings_file.upload(
             load_settings_file,
             inputs=[settings_file, state, logs_box],
             outputs=[
                 state,
                 settings_selector,
-                profile_label,
                 profile_title,
                 profile_description,
                 color_system,
@@ -1645,7 +1695,6 @@ def launch_app():
             outputs=[
                 state,
                 settings_selector,
-                profile_label,
                 profile_title,
                 profile_description,
                 color_system,
@@ -1678,7 +1727,6 @@ def launch_app():
             outputs=[
                 state,
                 settings_selector,
-                profile_label,
                 profile_title,
                 profile_description,
                 color_system,
@@ -1711,7 +1759,6 @@ def launch_app():
             outputs=[
                 state,
                 settings_selector,
-                profile_label,
                 profile_title,
                 profile_description,
                 color_system,
@@ -1744,16 +1791,25 @@ def launch_app():
             outputs=[settings_download, overlay_box, logs_box, settings_storage],
         )
 
+        settings_save_browser.click(
+            save_settings_to_browser,
+            inputs=[state, logs_box],
+            outputs=[overlay_box, logs_box, settings_storage],
+        )
+
         language_selector.change(
             change_language,
             inputs=[language_selector, state],
             outputs=[
                 state,
                 heading,
+                settings_section,
+                settings_selector,
                 profile_title,
                 profile_description,
                 settings_file,
                 settings_download,
+                settings_save_browser,
                 upload_section,
                 upload,
                 preprocess_section,
