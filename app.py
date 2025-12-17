@@ -129,7 +129,156 @@ def build_palette_css() -> str:
     return base_css + "\n".join(color_blocks)
 
 
-CUSTOM_CSS = build_palette_css()
+EXTRA_CSS = """
+:root {
+    --preview-scale: 2;
+}
+
+.preview-scale-wrapper {
+    overflow: auto;
+}
+
+.preview-scale-wrapper img {
+    transform: scale(var(--preview-scale));
+    transform-origin: top left;
+    image-rendering: pixelated;
+}
+
+.msx1pq-loading #msx1pq-loading {
+    display: flex;
+}
+
+#msx1pq-loading {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1200;
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(1.5px);
+}
+
+.msx1pq-loading-backdrop {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 24px;
+    border-radius: 12px;
+    background: #0f172acc;
+    color: #e2e8f0;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.msx1pq-spinner {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    border: 5px solid #334155;
+    border-top-color: #38bdf8;
+    animation: msx1pq-spin 0.9s linear infinite;
+}
+
+.msx1pq-loading-text {
+    font-weight: 700;
+    letter-spacing: 0.4px;
+}
+
+@keyframes msx1pq-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+"""
+
+CUSTOM_CSS = build_palette_css() + "\n" + EXTRA_CSS
+
+LOADING_BRIDGE = """
+<script>
+(() => {
+  const createOverlay = () => {
+    if (document.getElementById("msx1pq-loading")) return;
+    const overlay = document.createElement("div");
+    overlay.id = "msx1pq-loading";
+    overlay.innerHTML = `
+      <div class="msx1pq-loading-backdrop">
+        <div class="msx1pq-spinner"></div>
+        <div class="msx1pq-loading-text">Processing...</div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  };
+
+  const updateScale = (scale) => {
+    const value = Number(scale);
+    if (!value || value < 1 || value > 4) return;
+    document.documentElement.style.setProperty("--preview-scale", value);
+  };
+
+  const attachScaleListener = () => {
+    const root = gradioApp();
+    if (!root) return;
+    const dropdown = root.querySelector("#preview-scale select, #preview-scale input");
+    if (!dropdown || dropdown.dataset.boundScale === "1") return;
+    dropdown.dataset.boundScale = "1";
+    const sync = () => updateScale(dropdown.value);
+    dropdown.addEventListener("change", sync);
+    dropdown.addEventListener("input", sync);
+    sync();
+  };
+
+  const showOverlay = () => {
+    const root = gradioApp();
+    createOverlay();
+    document.body.classList.add("msx1pq-loading");
+    if (root) {
+      root.style.pointerEvents = "none";
+    }
+  };
+
+  const hideOverlay = () => {
+    const root = gradioApp();
+    document.body.classList.remove("msx1pq-loading");
+    const overlay = document.getElementById("msx1pq-loading");
+    if (overlay) overlay.remove();
+    if (root) {
+      root.style.pointerEvents = "";
+    }
+    attachScaleListener();
+  };
+
+  const wrapFetch = () => {
+    if (window.__msx1pq_fetch_wrapped) return;
+    window.__msx1pq_fetch_wrapped = true;
+    const origFetch = window.fetch;
+    let pending = 0;
+    window.fetch = async (...args) => {
+      pending += 1;
+      showOverlay();
+      try {
+        return await origFetch(...args);
+      } finally {
+        pending = Math.max(0, pending - 1);
+        if (pending === 0) {
+          hideOverlay();
+        }
+      }
+    };
+  };
+
+  const observer = new MutationObserver(() => attachScaleListener());
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+
+  wrapFetch();
+  attachScaleListener();
+})();
+</script>
+"""
+
 
 LOCAL_STORAGE_BRIDGE = """
 <script>
@@ -456,6 +605,7 @@ I18N = {
     "gallery_label": {"en": "Images", "ja": "画像"},
     "orig_label": {"en": "Original", "ja": "オリジナル"},
     "result_label": {"en": "Converted (PNG)", "ja": "変換結果 (PNG)"},
+    "scale_label": {"en": "Preview scale", "ja": "プレビュー拡大率"},
     "update_button": {"en": "Update", "ja": "更新"},
     "batch_button": {"en": "Batch convert", "ja": "バッチ実行"},
     "download_png": {"en": "Download PNG", "ja": "PNG をダウンロード"},
@@ -621,6 +771,7 @@ class AppState:
     lut_path: Optional[Path] = None
     language: str = "ja"
     profile_key: str = "default"
+    last_params: Dict[str, Optional[Union[str, bool, float, List[int]]]] = field(default_factory=dict)
 
     def has_images(self) -> bool:
         return bool(self.images)
@@ -696,6 +847,49 @@ def build_cli_args(params: Dict[str, Optional[Union[str, bool, float, List[int]]
 def to_disabled_colors(selected_use_colors: Optional[List[str]]) -> List[int]:
     selected_set = set(selected_use_colors or [])
     return [int(color) for color in COLOR_CHOICES if color not in selected_set]
+
+
+def build_params_from_inputs(
+    color_system,
+    dither_mode,
+    eight_dot,
+    distance,
+    preprocess,
+    weight_h,
+    weight_s,
+    weight_v,
+    weight_r,
+    weight_g,
+    weight_b,
+    posterize,
+    saturation,
+    gamma,
+    contrast,
+    hue,
+    use_colors,
+):
+    selected_disable_colors = to_disabled_colors(use_colors)
+    dither, dark_dither = dither_flags_from_mode(dither_mode)
+    return {
+        "color_system": color_system,
+        "dither": dither,
+        "dark_dither": dark_dither,
+        "eight_dot": eight_dot,
+        "distance": distance,
+        "no_preprocess": not preprocess,
+        "weight_h": weight_h,
+        "weight_s": weight_s,
+        "weight_v": weight_v,
+        "weight_r": weight_r,
+        "weight_g": weight_g,
+        "weight_b": weight_b,
+        "posterize": posterize,
+        "saturation": saturation,
+        "gamma": gamma,
+        "contrast": contrast,
+        "hue": hue,
+        "disable_colors": selected_disable_colors,
+    }
 
 
 def convert_image(
@@ -826,30 +1020,26 @@ def handle_upload(
     else:
         state.lut_path = None
 
-    selected_disable_colors = to_disabled_colors(use_colors)
-
-    dither, dark_dither = dither_flags_from_mode(dither_mode)
-
-    params = {
-        "color_system": color_system,
-        "dither": dither,
-        "dark_dither": dark_dither,
-        "eight_dot": eight_dot,
-        "distance": distance,
-        "no_preprocess": not preprocess,
-        "weight_h": weight_h,
-        "weight_s": weight_s,
-        "weight_v": weight_v,
-        "weight_r": weight_r,
-        "weight_g": weight_g,
-        "weight_b": weight_b,
-        "posterize": posterize,
-        "saturation": saturation,
-        "gamma": gamma,
-        "contrast": contrast,
-        "hue": hue,
-        "disable_colors": selected_disable_colors,
-    }
+    params = build_params_from_inputs(
+        color_system,
+        dither_mode,
+        eight_dot,
+        distance,
+        preprocess,
+        weight_h,
+        weight_s,
+        weight_v,
+        weight_r,
+        weight_g,
+        weight_b,
+        posterize,
+        saturation,
+        gamma,
+        contrast,
+        hue,
+        use_colors,
+    )
+    state.last_params = params
 
     png_path = None
     logs = ""
@@ -873,15 +1063,65 @@ def handle_upload(
     )
 
 
-def select_image(evt: gr.SelectData, state: AppState):
+def select_image(
+    evt: gr.SelectData,
+    state: AppState,
+    color_system,
+    dither_mode,
+    eight_dot,
+    distance,
+    preprocess,
+    weight_h,
+    weight_s,
+    weight_v,
+    weight_r,
+    weight_g,
+    weight_b,
+    posterize,
+    saturation,
+    gamma,
+    contrast,
+    hue,
+    use_colors,
+    lut_file,
+):
     if not state.images:
         return None, None, ""
     idx = int(evt.index) if evt and evt.index is not None else 0
     idx = max(0, min(idx, len(state.images) - 1))
     state.selected_index = idx
     record = state.current_image()
+    if lut_file is not None:
+        lut_dest = UPLOAD_DIR / f"lut_{uuid.uuid4()}_{Path(lut_file.name).name}"
+        shutil.copy(lut_file.name, lut_dest)
+        state.lut_path = lut_dest
+    params = build_params_from_inputs(
+        color_system,
+        dither_mode,
+        eight_dot,
+        distance,
+        preprocess,
+        weight_h,
+        weight_s,
+        weight_v,
+        weight_r,
+        weight_g,
+        weight_b,
+        posterize,
+        saturation,
+        gamma,
+        contrast,
+        hue,
+        use_colors,
+    )
+    state.last_params = params
+
     png_path = record.output_png()
-    return str(record.orig_path), str(png_path) if png_path else None, record.logs
+    logs = record.logs
+    if png_path is None:
+        png_path, _, logs = convert_image(record, params, state.lut_path)
+        record.logs = logs
+    return str(record.orig_path), str(png_path) if png_path else None, logs
 
 
 def update_single(
@@ -915,30 +1155,26 @@ def update_single(
     else:
         state.lut_path = None
 
-    selected_disable_colors = to_disabled_colors(use_colors)
-
-    dither, dark_dither = dither_flags_from_mode(dither_mode)
-
-    params = {
-        "color_system": color_system,
-        "dither": dither,
-        "dark_dither": dark_dither,
-        "eight_dot": eight_dot,
-        "distance": distance,
-        "no_preprocess": not preprocess,
-        "weight_h": weight_h,
-        "weight_s": weight_s,
-        "weight_v": weight_v,
-        "weight_r": weight_r,
-        "weight_g": weight_g,
-        "weight_b": weight_b,
-        "posterize": posterize,
-        "saturation": saturation,
-        "gamma": gamma,
-        "contrast": contrast,
-        "hue": hue,
-        "disable_colors": selected_disable_colors,
-    }
+    params = build_params_from_inputs(
+        color_system,
+        dither_mode,
+        eight_dot,
+        distance,
+        preprocess,
+        weight_h,
+        weight_s,
+        weight_v,
+        weight_r,
+        weight_g,
+        weight_b,
+        posterize,
+        saturation,
+        gamma,
+        contrast,
+        hue,
+        use_colors,
+    )
+    state.last_params = params
     record = state.current_image()
     if record is None:
         return None, t("no_selected_image", state.language)
@@ -988,30 +1224,26 @@ def batch_run(
     else:
         state.lut_path = None
 
-    selected_disable_colors = to_disabled_colors(use_colors)
-
-    dither, dark_dither = dither_flags_from_mode(dither_mode)
-
-    params = {
-        "color_system": color_system,
-        "dither": dither,
-        "dark_dither": dark_dither,
-        "eight_dot": eight_dot,
-        "distance": distance,
-        "no_preprocess": not preprocess,
-        "weight_h": weight_h,
-        "weight_s": weight_s,
-        "weight_v": weight_v,
-        "weight_r": weight_r,
-        "weight_g": weight_g,
-        "weight_b": weight_b,
-        "posterize": posterize,
-        "saturation": saturation,
-        "gamma": gamma,
-        "contrast": contrast,
-        "hue": hue,
-        "disable_colors": selected_disable_colors,
-    }
+    params = build_params_from_inputs(
+        color_system,
+        dither_mode,
+        eight_dot,
+        distance,
+        preprocess,
+        weight_h,
+        weight_s,
+        weight_v,
+        weight_r,
+        weight_g,
+        weight_b,
+        posterize,
+        saturation,
+        gamma,
+        contrast,
+        hue,
+        use_colors,
+    )
+    state.last_params = params
     log_text, _ = convert_all(params, state)
     return log_text, gr.update(interactive=True)
 
@@ -1066,6 +1298,7 @@ def change_language(lang: str, state: AppState):
         gr.update(label=t("palette_label", lang), choices=palette),
         gr.update(label=t("images_section", lang)),
         gr.update(label=t("gallery_label", lang)),
+        gr.update(label=t("scale_label", lang)),
         gr.update(label=t("orig_label", lang)),
         gr.update(label=t("result_label", lang)),
         gr.update(value=t("update_button", lang)),
@@ -1358,7 +1591,7 @@ def launch_app():
         state = gr.State(AppState(language=default_lang, profile_key=default_profile.key))
 
         settings_storage = gr.Textbox(value=current_settings_json(), visible=False, elem_id="local-settings-json")
-        storage_helper = gr.HTML(value=LOCAL_STORAGE_BRIDGE, visible=False)
+        storage_helper = gr.HTML(value=LOCAL_STORAGE_BRIDGE + LOADING_BRIDGE, visible=False)
 
         initial_overlay = (
             render_overlay("; ".join(SETTINGS_MANAGER.global_errors), "error") if SETTINGS_MANAGER.global_errors else ""
@@ -1554,10 +1787,23 @@ def launch_app():
                 gallery = gr.Gallery(label=t("gallery_label", default_lang), columns=4, height=200)
 
             with gr.Row():
+                scale_dropdown = gr.Dropdown(
+                    label=t("scale_label", default_lang),
+                    choices=["1", "2", "3", "4"],
+                    value="2",
+                    elem_id="preview-scale",
+                    allow_custom_value=False,
+                )
+
+            with gr.Row():
                 with gr.Column():
-                    orig_preview = gr.Image(label=t("orig_label", default_lang), interactive=False)
+                    orig_preview = gr.Image(
+                        label=t("orig_label", default_lang), interactive=False, elem_classes=["preview-scale-wrapper"]
+                    )
                 with gr.Column():
-                    result_preview = gr.Image(label=t("result_label", default_lang), interactive=False)
+                    result_preview = gr.Image(
+                        label=t("result_label", default_lang), interactive=False, elem_classes=["preview-scale-wrapper"]
+                    )
 
         with gr.Row():
             update_btn = gr.Button(t("update_button", default_lang), variant="primary", interactive=False)
@@ -1627,7 +1873,27 @@ def launch_app():
 
         gallery.select(
             select_image,
-            inputs=[state],
+            inputs=[
+                state,
+                color_system,
+                dither_mode,
+                eight_dot,
+                distance,
+                preprocessing,
+                weight_h,
+                weight_s,
+                weight_v,
+                weight_r,
+                weight_g,
+                weight_b,
+                posterize,
+                saturation,
+                gamma,
+                contrast,
+                hue,
+                use_colors,
+                lut_upload,
+            ],
             outputs=[orig_preview, result_preview, logs_box],
         )
 
@@ -1915,6 +2181,7 @@ def launch_app():
                 use_colors,
                 images_section,
                 gallery,
+                scale_dropdown,
                 orig_preview,
                 result_preview,
                 update_btn,
