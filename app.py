@@ -24,40 +24,6 @@ for path in (UPLOAD_DIR, OUTPUT_DIR, ZIP_DIR):
 DISK_SIZE_BYTES = 720 * 1024
 COLOR_CHOICES = [str(i) for i in range(1, 16)]
 
-PALETTE_COLORS: List[Tuple[int, int, int]] = [
-    (0, 0, 0),
-    (62, 184, 73),
-    (116, 208, 125),
-    (89, 85, 224),
-    (128, 118, 241),
-    (185, 94, 81),
-    (101, 219, 239),
-    (219, 101, 89),
-    (255, 137, 125),
-    (204, 195, 94),
-    (222, 208, 135),
-    (58, 162, 65),
-    (183, 102, 181),
-    (204, 204, 204),
-    (255, 255, 255),
-]
-
-CUSTOM_CSS = """
-.palette-choice {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.palette-swatch {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border: 1px solid #00000066;
-    box-sizing: border-box;
-}
-"""
-
 I18N = {
     "heading_title": {
         "en": "# MMSXX MSX1 Palette Quantizer for Hugging Face Spaces",
@@ -162,12 +128,7 @@ def t(key: str, lang: str) -> str:
 
 
 def palette_choices(lang: str) -> List[Tuple[str, str]]:
-    choices: List[Tuple[str, str]] = []
-    for i, (r, g, b) in enumerate(PALETTE_COLORS, start=1):
-        swatch = f"<span class='palette-swatch' style='background: rgb({r}, {g}, {b});'></span>"
-        label = f"<span class='palette-choice'>{swatch}<span>#{i}</span></span>"
-        choices.append((label, str(i)))
-    return choices
+    return [(f"{t('color_label', lang)} {i}", str(i)) for i in range(1, 16)]
 
 
 def ensure_executables() -> None:
@@ -697,7 +658,7 @@ def launch_app():
 
     default_lang = "ja"
 
-    with gr.Blocks(title="MMSXX MSX1 Palette Quantizer", css=CUSTOM_CSS) as demo:
+    with gr.Blocks(title="MMSXX MSX1 Palette Quantizer") as demo:
         state = gr.State(AppState(language=default_lang))
 
         with gr.Row():
