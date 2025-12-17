@@ -26,6 +26,9 @@ for path in (UPLOAD_DIR, OUTPUT_DIR, ZIP_DIR):
 
 DISK_SIZE_BYTES = 720 * 1024
 COLOR_CHOICES = [str(i) for i in range(1, 16)]
+DITHER_MODE_NONE = "none"
+DITHER_MODE_STANDARD = "standard"
+DITHER_MODE_DARK = "dark"
 
 PALETTE_COLORS: List[Tuple[int, int, int]] = [
     (0, 0, 0),
@@ -396,9 +399,13 @@ I18N = {
     "distance_label": {"en": "Distance", "ja": "距離計測"},
     "distance_info": {"en": "CLI default is rgb", "ja": "CLI デフォルトは rgb"},
     "dither_label": {"en": "Dither", "ja": "ディザー"},
-    "dither_info": {"en": "Default ON (CLI)", "ja": "CLI デフォルト ON"},
-    "dark_dither_label": {"en": "Dark dither", "ja": "ダークディザー"},
-    "dark_dither_info": {"en": "Default ON (CLI)", "ja": "CLI デフォルト ON"},
+    "dither_info": {
+        "en": "Choose the dither mode (CLI default: Dither with dark shades).",
+        "ja": "ディザー方法を選択 (CLI デフォルト: ディザー/暗部あり)。",
+    },
+    "dither_mode_none": {"en": "None", "ja": "なし"},
+    "dither_mode_standard": {"en": "Dither", "ja": "ディザー"},
+    "dither_mode_dark": {"en": "Dither (with dark)", "ja": "ディザー（暗部あり）"},
     "preprocess_section": {"en": "Preprocess adjustments", "ja": "前処理"},
     "preprocessing_label": {"en": "Preprocessing", "ja": "前処理"},
     "preprocessing_info": {
@@ -513,6 +520,30 @@ def t(key: str, lang: str) -> str:
 
 def palette_choices(lang: str) -> List[Tuple[str, str]]:
     return [(f"#{i}", str(i)) for i in range(1, len(PALETTE_COLORS) + 1)]
+
+
+def dither_mode_choices(lang: str) -> List[Tuple[str, str]]:
+    return [
+        (t("dither_mode_none", lang), DITHER_MODE_NONE),
+        (t("dither_mode_standard", lang), DITHER_MODE_STANDARD),
+        (t("dither_mode_dark", lang), DITHER_MODE_DARK),
+    ]
+
+
+def to_dither_mode(dither: Optional[bool], dark_dither: Optional[bool]) -> str:
+    if dither is False:
+        return DITHER_MODE_NONE
+    if dark_dither:
+        return DITHER_MODE_DARK
+    return DITHER_MODE_STANDARD
+
+
+def dither_flags_from_mode(mode: Optional[str]) -> Tuple[bool, bool]:
+    if mode == DITHER_MODE_NONE:
+        return False, False
+    if mode == DITHER_MODE_DARK:
+        return True, True
+    return True, False
 
 
 def to_use_colors(value: Optional[List[Union[str, int]]]) -> List[str]:
@@ -751,8 +782,7 @@ def update_gallery(state: AppState) -> List[Tuple[str, str]]:
 def handle_upload(
     files,
     color_system,
-    dither,
-    dark_dither,
+    dither_mode,
     eight_dot,
     distance,
     preprocess,
@@ -797,6 +827,8 @@ def handle_upload(
         state.lut_path = None
 
     selected_disable_colors = to_disabled_colors(use_colors)
+
+    dither, dark_dither = dither_flags_from_mode(dither_mode)
 
     params = {
         "color_system": color_system,
@@ -854,8 +886,7 @@ def select_image(evt: gr.SelectData, state: AppState):
 
 def update_single(
     color_system,
-    dither,
-    dark_dither,
+    dither_mode,
     eight_dot,
     distance,
     preprocess,
@@ -885,6 +916,8 @@ def update_single(
         state.lut_path = None
 
     selected_disable_colors = to_disabled_colors(use_colors)
+
+    dither, dark_dither = dither_flags_from_mode(dither_mode)
 
     params = {
         "color_system": color_system,
@@ -929,8 +962,7 @@ def convert_all(
 
 def batch_run(
     color_system,
-    dither,
-    dark_dither,
+    dither_mode,
     eight_dot,
     distance,
     preprocess,
@@ -957,6 +989,8 @@ def batch_run(
         state.lut_path = None
 
     selected_disable_colors = to_disabled_colors(use_colors)
+
+    dither, dark_dither = dither_flags_from_mode(dither_mode)
 
     params = {
         "color_system": color_system,
@@ -1017,8 +1051,11 @@ def change_language(lang: str, state: AppState):
         gr.update(label=t("color_system_label", lang), info=t("color_system_info", lang)),
         gr.update(label=t("eight_dot_label", lang), info=t("eight_dot_info", lang)),
         gr.update(label=t("distance_label", lang), info=t("distance_info", lang)),
-        gr.update(label=t("dither_label", lang), info=t("dither_info", lang)),
-        gr.update(label=t("dark_dither_label", lang), info=t("dark_dither_info", lang)),
+        gr.update(
+            label=t("dither_label", lang),
+            info=t("dither_info", lang),
+            choices=dither_mode_choices(lang),
+        ),
         gr.update(label=t("weights_section", lang)),
         gr.update(label=t("weight_h_label", lang), info=t("weight_info", lang)),
         gr.update(label=t("weight_s_label", lang), info=t("weight_info", lang)),
@@ -1070,8 +1107,11 @@ def build_profile_outputs(
         gr.update(value=profile_value(values, "color_system", "msx1")),
         gr.update(value=profile_value(values, "eight_dot", "best")),
         gr.update(value=profile_value(values, "distance", "rgb")),
-        gr.update(value=profile_value(values, "dither", True)),
-        gr.update(value=profile_value(values, "dark_dither", True)),
+        gr.update(
+            value=to_dither_mode(
+                profile_value(values, "dither", True), profile_value(values, "dark_dither", True)
+            )
+        ),
         gr.update(value=profile_value(values, "preprocess", True)),
         gr.update(value=profile_value(values, "posterize", 0)),
         gr.update(value=profile_value(values, "saturation", 0.0)),
@@ -1419,15 +1459,14 @@ def launch_app():
                     value=profile_value(default_values, "distance", "rgb"),
                     info=t("distance_info", default_lang),
                 )
-                dither = gr.Checkbox(
+                dither_mode = gr.Dropdown(
                     label=t("dither_label", default_lang),
-                    value=profile_value(default_values, "dither", True),
+                    choices=dither_mode_choices(default_lang),
+                    value=to_dither_mode(
+                        profile_value(default_values, "dither", True),
+                        profile_value(default_values, "dark_dither", True),
+                    ),
                     info=t("dither_info", default_lang),
-                )
-                dark_dither = gr.Checkbox(
-                    label=t("dark_dither_label", default_lang),
-                    value=profile_value(default_values, "dark_dither", True),
-                    info=t("dark_dither_info", default_lang),
                 )
 
             with gr.Accordion(t("weights_section", default_lang), open=False) as weights_section:
@@ -1552,8 +1591,7 @@ def launch_app():
             inputs=[
                 upload,
                 color_system,
-                dither,
-                dark_dither,
+                dither_mode,
                 eight_dot,
                 distance,
                 preprocessing,
@@ -1597,8 +1635,7 @@ def launch_app():
             update_single,
             inputs=[
                 color_system,
-                dither,
-                dark_dither,
+                dither_mode,
                 eight_dot,
                 distance,
                 preprocessing,
@@ -1635,8 +1672,7 @@ def launch_app():
             batch_run,
             inputs=[
                 color_system,
-                dither,
-                dark_dither,
+                dither_mode,
                 eight_dot,
                 distance,
                 preprocessing,
@@ -1678,8 +1714,7 @@ def launch_app():
                 color_system,
                 eight_dot,
                 distance,
-                dither,
-                dark_dither,
+                dither_mode,
                 preprocessing,
                 posterize,
                 saturation,
@@ -1709,8 +1744,7 @@ def launch_app():
                 color_system,
                 eight_dot,
                 distance,
-                dither,
-                dark_dither,
+                dither_mode,
                 preprocessing,
                 posterize,
                 saturation,
@@ -1741,8 +1775,7 @@ def launch_app():
                 color_system,
                 eight_dot,
                 distance,
-                dither,
-                dark_dither,
+                dither_mode,
                 preprocessing,
                 posterize,
                 saturation,
@@ -1773,8 +1806,7 @@ def launch_app():
                 color_system,
                 eight_dot,
                 distance,
-                dither,
-                dark_dither,
+                dither_mode,
                 preprocessing,
                 posterize,
                 saturation,
@@ -1805,8 +1837,7 @@ def launch_app():
                 color_system,
                 eight_dot,
                 distance,
-                dither,
-                dark_dither,
+                dither_mode,
                 preprocessing,
                 posterize,
                 saturation,
@@ -1873,8 +1904,7 @@ def launch_app():
                 color_system,
                 eight_dot,
                 distance,
-                dither,
-                dark_dither,
+                dither_mode,
                 weights_section,
                 weight_h,
                 weight_s,
