@@ -1282,7 +1282,7 @@ def launch_app():
     default_profile = SETTINGS_MANAGER.default_profile
     default_values = SETTINGS_MANAGER.values_for(default_profile)
 
-    with gr.Blocks(title="MMSXX MSX1 Palette Quantizer", css=CUSTOM_CSS) as demo:
+    with gr.Blocks(title="MMSXX MSX1 Palette Quantizer") as demo:
         state = gr.State(AppState(language=default_lang, profile_key=default_profile.key))
 
         settings_storage = gr.Textbox(value=current_settings_json(), visible=False, elem_id="local-settings-json")
@@ -1294,15 +1294,16 @@ def launch_app():
         overlay_box = gr.HTML(value=initial_overlay, show_label=False)
 
         with gr.Row(equal_height=True):
-            heading = gr.Markdown(t("heading_title", default_lang), scale=4)
-            language_selector = gr.Dropdown(
-                label="",
-                show_label=False,
-                choices=[("lang:ja", "ja"), ("lang:en", "en")],
-                value=default_lang,
-                scale=0,
-                min_width=160,
-            )
+            with gr.Column(scale=4):
+                heading = gr.Markdown(t("heading_title", default_lang))
+            with gr.Column(min_width=160):
+                language_selector = gr.Dropdown(
+                    label="",
+                    show_label=False,
+                    choices=[("lang:ja", "ja"), ("lang:en", "en")],
+                    value=default_lang,
+                    min_width=160,
+                )
 
         with gr.Accordion(t("upload_section", default_lang), open=True) as upload_section:
             upload = gr.File(
@@ -1874,7 +1875,7 @@ def launch_app():
 
 def main():
     demo = launch_app()
-    demo.queue().launch()
+    demo.queue().launch(css=CUSTOM_CSS)
 
 
 if __name__ == "__main__":
