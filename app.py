@@ -498,8 +498,10 @@ I18N = {
     "settings_import": {"en": "Load settings (JSON)", "ja": "設定を読み込む (JSON)"},
     "settings_export": {"en": "Export settings (JSON)", "ja": "設定を書き出す (JSON)"},
     "settings_save_browser": {"en": "Save settings to browser", "ja": "設定をブラウザに保存"},
+    "settings_clear_browser": {"en": "Clear browser settings", "ja": "ブラウザ設定をクリア"},
     "settings_loaded": {"en": "Settings loaded.", "ja": "設定を読み込みました。"},
     "settings_saved": {"en": "Settings saved to browser.", "ja": "設定をブラウザに保存しました。"},
+    "settings_cleared": {"en": "Settings cleared from browser.", "ja": "ブラウザの設定を削除しました。"},
     "profile_updated": {"en": "Profile title/description updated.", "ja": "設定のタイトルと説明を更新しました。"},
     "settings_invalid": {"en": "Failed to load settings.", "ja": "設定の読み込みに失敗しました。"},
 }
@@ -969,6 +971,7 @@ def change_language(lang: str, state: AppState):
         gr.update(label=t("settings_import", lang)),
         gr.update(label=t("settings_export", lang)),
         gr.update(value=t("settings_save_browser", lang)),
+        gr.update(value=t("settings_clear_browser", lang)),
         gr.update(label=t("upload_section", lang)),
         gr.update(label=t("upload_label", lang)),
         gr.update(label=t("preprocess_section", lang)),
@@ -1182,6 +1185,11 @@ def save_settings_to_browser(state: AppState, logs_text: str):
     return overlay_update(t("settings_saved", state.language), "info"), gr.update(value=logs), gr.update(value=current_settings_json())
 
 
+def clear_settings_in_browser(state: AppState, logs_text: str):
+    logs = append_log(logs_text, "info", t("settings_cleared", state.language))
+    return overlay_update(t("settings_cleared", state.language), "info"), gr.update(value=logs), gr.update(value="")
+
+
 def zip_files(file_paths: List[Path], zip_name: str) -> Path:
     ZIP_DIR.mkdir(parents=True, exist_ok=True)
     zip_path = ZIP_DIR / zip_name
@@ -1277,14 +1285,6 @@ def launch_app():
     with gr.Blocks(title="MMSXX MSX1 Palette Quantizer", css=CUSTOM_CSS) as demo:
         state = gr.State(AppState(language=default_lang, profile_key=default_profile.key))
 
-        with gr.Row():
-            language_selector = gr.Dropdown(
-                label="",
-                show_label=False,
-                choices=[("lang:ja", "ja"), ("lang:en", "en")],
-                value=default_lang,
-            )
-
         settings_storage = gr.Textbox(value=current_settings_json(), visible=False, elem_id="local-settings-json")
         storage_helper = gr.HTML(value=LOCAL_STORAGE_BRIDGE, visible=False)
 
@@ -1293,7 +1293,16 @@ def launch_app():
         )
         overlay_box = gr.HTML(value=initial_overlay, show_label=False)
 
-        heading = gr.Markdown(t("heading_title", default_lang))
+        with gr.Row(equal_height=True):
+            heading = gr.Markdown(t("heading_title", default_lang), scale=4)
+            language_selector = gr.Dropdown(
+                label="",
+                show_label=False,
+                choices=[("lang:ja", "ja"), ("lang:en", "en")],
+                value=default_lang,
+                scale=0,
+                min_width=160,
+            )
 
         with gr.Accordion(t("upload_section", default_lang), open=True) as upload_section:
             upload = gr.File(
@@ -1468,6 +1477,7 @@ def launch_app():
                     label=t("settings_export", default_lang), file_name="settings.json"
                 )
                 settings_save_browser = gr.Button(t("settings_save_browser", default_lang))
+                settings_clear_browser = gr.Button(t("settings_clear_browser", default_lang))
 
         with gr.Accordion(t("images_section", default_lang), open=False) as images_section:
             with gr.Row():
@@ -1797,6 +1807,12 @@ def launch_app():
             outputs=[overlay_box, logs_box, settings_storage],
         )
 
+        settings_clear_browser.click(
+            clear_settings_in_browser,
+            inputs=[state, logs_box],
+            outputs=[overlay_box, logs_box, settings_storage],
+        )
+
         language_selector.change(
             change_language,
             inputs=[language_selector, state],
@@ -1810,6 +1826,7 @@ def launch_app():
                 settings_file,
                 settings_download,
                 settings_save_browser,
+                settings_clear_browser,
                 upload_section,
                 upload,
                 preprocess_section,
