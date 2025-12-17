@@ -24,6 +24,32 @@ for path in (UPLOAD_DIR, OUTPUT_DIR, ZIP_DIR):
 DISK_SIZE_BYTES = 720 * 1024
 COLOR_CHOICES = [str(i) for i in range(1, 16)]
 
+PALETTE_COLORS: List[Tuple[int, int, int]] = [
+    (0, 0, 0),
+    (62, 184, 73),
+    (116, 208, 125),
+    (89, 85, 224),
+    (128, 118, 241),
+    (185, 94, 81),
+    (101, 219, 239),
+    (219, 101, 89),
+    (255, 137, 125),
+    (204, 195, 94),
+    (222, 208, 135),
+    (58, 162, 65),
+    (183, 102, 181),
+    (204, 204, 204),
+    (255, 255, 255),
+]
+
+BASE_CUSTOM_CSS = """
+.palette-choice {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+"""
+
 I18N = {
     "heading_title": {
         "en": "# MMSXX MSX1 Palette Quantizer for Hugging Face Spaces",
@@ -128,7 +154,38 @@ def t(key: str, lang: str) -> str:
 
 
 def palette_choices(lang: str) -> List[Tuple[str, str]]:
-    return [(f"{t('color_label', lang)} {i}", str(i)) for i in range(1, 16)]
+    choices: List[Tuple[str, str]] = []
+    for i, (_r, _g, _b) in enumerate(PALETTE_COLORS, start=1):
+        label = f"#{i}"
+        choices.append((label, str(i)))
+    return choices
+
+
+def _palette_text_color(r: int, g: int, b: int) -> str:
+    luminance = 0.299 * r + 0.587 * g + 0.114 * b
+    return "#000000" if luminance >= 140 else "#ffffff"
+
+
+def palette_css(elem_id: str) -> str:
+    rules: List[str] = [
+        f"#{elem_id} label {{\n    border-radius: 6px;\n    padding: 4px 8px;\n}}",
+        f"#{elem_id} input[type='checkbox'] {{\n    margin-right: 6px;\n}}",
+    ]
+    for i, (r, g, b) in enumerate(PALETTE_COLORS, start=1):
+        text_color = _palette_text_color(r, g, b)
+        rules.append(
+            f"""#{elem_id} input[value='{i}'] ~ span {{
+    background-color: rgb({r}, {g}, {b});
+    color: {text_color};
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+}}"""
+        )
+    return "\n".join(rules)
+
+
+CUSTOM_CSS = BASE_CUSTOM_CSS + "\n" + palette_css("palette-checkbox")
 
 
 def ensure_executables() -> None:
@@ -658,7 +715,7 @@ def launch_app():
 
     default_lang = "ja"
 
-    with gr.Blocks(title="MMSXX MSX1 Palette Quantizer") as demo:
+    with gr.Blocks(title="MMSXX MSX1 Palette Quantizer", css=CUSTOM_CSS) as demo:
         state = gr.State(AppState(language=default_lang))
 
         with gr.Row():
@@ -812,6 +869,7 @@ def launch_app():
             label=t("palette_label", default_lang),
             choices=palette_choices(default_lang),
             value=COLOR_CHOICES,
+            elem_id="palette-checkbox",
         )
 
         upload = gr.File(
