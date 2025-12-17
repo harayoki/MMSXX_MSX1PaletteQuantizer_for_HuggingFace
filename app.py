@@ -533,26 +533,13 @@ def launch_app():
                 info="Default ON (CLI)",
             )
 
-        upload = gr.File(label="Upload images (PNG, up to 32)", file_count="multiple", file_types=["image"])
-
-        with gr.Accordion("Weights", open=False):
-            with gr.Row():
-                weight_h = gr.Number(label="HSV weight H", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
-                weight_s = gr.Number(label="HSV weight S", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
-                weight_v = gr.Number(label="HSV weight V", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
-            with gr.Row():
-                weight_r = gr.Number(label="RGB weight R", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
-                weight_g = gr.Number(label="RGB weight G", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
-                weight_b = gr.Number(label="RGB weight B", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
-
-        with gr.Group():
+        with gr.Accordion("Preprocess adjustments", open=True):
             preprocessing = gr.Checkbox(
                 label="Preprocessing",
                 value=True,
                 info="Default ON (CLI). Turn off to skip preprocessing (--no-preprocess).",
             )
 
-            gr.Markdown("### Preprocess adjustments")
             with gr.Row():
                 posterize = gr.Number(
                     label="Posterize before processing",
@@ -570,7 +557,6 @@ def launch_app():
                     step=0.01,
                     info="CLI default 0.0",
                 )
-            with gr.Row():
                 gamma = gr.Number(
                     label="Pre-gamma",
                     value=1.0,
@@ -596,18 +582,30 @@ def launch_app():
                     info="CLI default 0.0",
                 )
 
-            gr.Markdown("### Optional LUT")
-            lut_upload = gr.File(
-                label="LUT file (optional)",
-                file_types=[".cube", ".txt", ".lut", ".csv"],
-                file_count="single",
-            )
+            with gr.Accordion("Optional LUT", open=False):
+                lut_upload = gr.File(
+                    label="LUT file (optional)",
+                    file_types=[".cube", ".txt", ".lut", ".csv"],
+                    file_count="single",
+                )
 
-            use_colors = gr.CheckboxGroup(
-                label="USE COLOR (1-15)",
-                choices=[(f"Color {i}", str(i)) for i in range(1, 16)],
-                value=COLOR_CHOICES,
-            )
+        upload = gr.File(label="Upload images (PNG, up to 32)", file_count="multiple", file_types=["image"])
+
+        with gr.Accordion("Weights", open=False):
+            with gr.Row():
+                weight_h = gr.Number(label="HSV weight H", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
+                weight_s = gr.Number(label="HSV weight S", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
+                weight_v = gr.Number(label="HSV weight V", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
+            with gr.Row():
+                weight_r = gr.Number(label="RGB weight R", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
+                weight_g = gr.Number(label="RGB weight G", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
+                weight_b = gr.Number(label="RGB weight B", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
+
+        use_colors = gr.CheckboxGroup(
+            label="USE COLOR (1-15)",
+            choices=[(f"Color {i}", str(i)) for i in range(1, 16)],
+            value=COLOR_CHOICES,
+        )
 
         with gr.Row():
             gallery = gr.Gallery(label="Images", columns=4, height=200)
