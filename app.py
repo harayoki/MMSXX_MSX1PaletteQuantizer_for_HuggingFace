@@ -677,30 +677,60 @@ def convert_image(
         shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    args = [str(MSX1PQ_BIN), "--input", str(record.orig_path), "--output", str(out_dir), "--out-sc2"]
-    args.extend(build_cli_args(params, lut_path))
+    base_args = [
+        str(MSX1PQ_BIN),
+        "--input",
+        str(record.orig_path),
+        "--output",
+        str(out_dir),
+    ]
+    base_args.extend(build_cli_args(params, lut_path))
+
+    logs: List[str] = []
+
+    def run_cli(extra_args: List[str], label: str) -> subprocess.CompletedProcess:
+        args = base_args + extra_args
+        try:
+            result = subprocess.run(args, check=True, capture_output=True, text=True)
+            stdout = result.stdout
+            stderr = result.stderr
+        except subprocess.CalledProcessError as exc:
+            stdout = exc.stdout or ""
+            stderr = exc.stderr or ""
+            logs.append(
+                f"{label} Command: {' '.join(args)}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}"
+            )
+            raise
+        logs.append(
+            f"{label} Command: {' '.join(args)}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}"
+        )
+        return result
+
+    png_path: Optional[Path] = None
+    sc2_path: Optional[Path] = None
 
     try:
-        result = subprocess.run(args, check=True, capture_output=True, text=True)
-        stdout = result.stdout
-        stderr = result.stderr
-    except subprocess.CalledProcessError as exc:
-        stdout = exc.stdout or ""
-        stderr = exc.stderr or ""
+        run_cli([], "PNG")
+        png_files = sorted(out_dir.glob("*.png"))
+        png_path = png_files[0] if png_files else None
+    except subprocess.CalledProcessError:
         record.outputs = {}
-        record.logs = f"Command: {' '.join(args)}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}"
+        record.logs = "\n\n".join(logs)
         return None, None, record.logs
 
-    png_files = sorted(out_dir.glob("*.png"))
-    sc2_files = sorted(out_dir.glob("*.sc2"))
-    png_path = png_files[0] if png_files else None
-    sc2_path = sc2_files[0] if sc2_files else None
+    try:
+        run_cli(["--out-sc2"], "SC2")
+        sc2_files = sorted(out_dir.glob("*.sc2"))
+        sc2_path = sc2_files[0] if sc2_files else None
+    except subprocess.CalledProcessError:
+        sc2_path = None
+
     record.outputs = {}
     if png_path:
         record.outputs["png"] = png_path
     if sc2_path:
         record.outputs["sc2"] = sc2_path
-    record.logs = f"Command: {' '.join(args)}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}"
+    record.logs = "\n\n".join(logs)
     return png_path, sc2_path, record.logs
 
 
