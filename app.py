@@ -24,6 +24,112 @@ for path in (UPLOAD_DIR, OUTPUT_DIR, ZIP_DIR):
 DISK_SIZE_BYTES = 720 * 1024
 COLOR_CHOICES = [str(i) for i in range(1, 16)]
 
+I18N = {
+    "heading_title": {
+        "en": "# MMSXX MSX1 Palette Quantizer for Hugging Face Spaces",
+        "ja": "# MMSXX MSX1 Palette Quantizer for Hugging Face Spaces",
+    },
+    "heading_basic": {"en": "### BASIC Parameters", "ja": "### BASICパラメーターズ"},
+    "language_label": {"en": "Language", "ja": "言語"},
+    "color_system_label": {"en": "Color System", "ja": "カラーシステム"},
+    "color_system_info": {"en": "CLI default is msx1", "ja": "CLI デフォルトは msx1"},
+    "eight_dot_label": {"en": "8dot", "ja": "8dot"},
+    "eight_dot_info": {"en": "CLI default is best", "ja": "CLI デフォルトは best"},
+    "distance_label": {"en": "Distance", "ja": "距離計測"},
+    "distance_info": {"en": "CLI default is rgb", "ja": "CLI デフォルトは rgb"},
+    "dither_label": {"en": "Dither", "ja": "ディザー"},
+    "dither_info": {"en": "Default ON (CLI)", "ja": "CLI デフォルト ON"},
+    "dark_dither_label": {"en": "Dark dither", "ja": "ダークディザー"},
+    "dark_dither_info": {"en": "Default ON (CLI)", "ja": "CLI デフォルト ON"},
+    "preprocess_section": {"en": "Preprocess adjustments", "ja": "前処理"},
+    "preprocessing_label": {"en": "Preprocessing", "ja": "前処理"},
+    "preprocessing_info": {
+        "en": "Default ON (CLI). Turn off to skip preprocessing (--no-preprocess).",
+        "ja": "CLI デフォルト ON。OFF で前処理をスキップ (--no-preprocess)",
+    },
+    "posterize_label": {"en": "Posterize before processing", "ja": "処理前ポスタライズ"},
+    "posterize_info": {
+        "en": "CLI default 16 (ignored if <=1)",
+        "ja": "CLI デフォルト 16 (1 以下で無効)",
+    },
+    "saturation_label": {"en": "Pre-saturation", "ja": "処理前彩度"},
+    "saturation_info": {"en": "CLI default 0.0", "ja": "CLI デフォルト 0.0"},
+    "gamma_label": {"en": "Pre-gamma", "ja": "処理前ガンマ"},
+    "gamma_info": {"en": "CLI default 1.0", "ja": "CLI デフォルト 1.0"},
+    "contrast_label": {"en": "Pre-contrast", "ja": "処理前コントラスト"},
+    "contrast_info": {"en": "CLI default 1.0", "ja": "CLI デフォルト 1.0"},
+    "hue_label": {"en": "Pre-hue", "ja": "処理前色相"},
+    "hue_info": {"en": "CLI default 0.0", "ja": "CLI デフォルト 0.0"},
+    "lut_section": {"en": "Optional LUT", "ja": "LUT (任意)"},
+    "lut_label": {"en": "LUT file (optional)", "ja": "LUT ファイル (任意)"},
+    "weights_section": {"en": "Weights", "ja": "重み"},
+    "weight_h_label": {"en": "HSV weight H", "ja": "HSV 重み H"},
+    "weight_s_label": {"en": "HSV weight S", "ja": "HSV 重み S"},
+    "weight_v_label": {"en": "HSV weight V", "ja": "HSV 重み V"},
+    "weight_r_label": {"en": "RGB weight R", "ja": "RGB 重み R"},
+    "weight_g_label": {"en": "RGB weight G", "ja": "RGB 重み G"},
+    "weight_b_label": {"en": "RGB weight B", "ja": "RGB 重み B"},
+    "weight_info": {"en": "0-1", "ja": "0-1"},
+    "palette_label": {"en": "Palette", "ja": "パレット"},
+    "color_label": {"en": "Color", "ja": "カラー"},
+    "upload_label": {
+        "en": "Upload images (PNG, up to 32)",
+        "ja": "画像をアップロード (PNG, 最大 32)",
+    },
+    "gallery_label": {"en": "Images", "ja": "画像"},
+    "orig_label": {"en": "Original", "ja": "オリジナル"},
+    "result_label": {"en": "Converted (PNG)", "ja": "変換結果 (PNG)"},
+    "update_button": {"en": "Update", "ja": "更新"},
+    "batch_button": {"en": "Batch convert", "ja": "バッチ実行"},
+    "download_png": {"en": "Download PNG", "ja": "PNG をダウンロード"},
+    "download_sc2": {"en": "Download SC2", "ja": "SC2 をダウンロード"},
+    "batch_section": {"en": "Batch download", "ja": "バッチダウンロード"},
+    "batch_type_label": {"en": "Download type", "ja": "ダウンロード種類"},
+    "batch_zip_png": {"en": "zip(png)", "ja": "zip(png)"},
+    "batch_zip_sc2": {"en": "zip(sc2)", "ja": "zip(sc2)"},
+    "batch_zip_dsk": {"en": "zip(dsk)", "ja": "zip(dsk)"},
+    "batch_zip_rom32k": {"en": "zip(32krom)", "ja": "zip(32krom)"},
+    "batch_download": {"en": "Download batch ZIP", "ja": "バッチ ZIP ダウンロード"},
+    "batch_status": {"en": "Batch status", "ja": "バッチ状態"},
+    "logs": {"en": "Logs", "ja": "ログ"},
+    "no_images_uploaded": {"en": "No images uploaded.", "ja": "画像がアップロードされていません。"},
+    "no_selected_image": {"en": "No selected image.", "ja": "選択された画像がありません。"},
+    "no_images_process": {"en": "No images to process.", "ja": "処理する画像がありません。"},
+    "status_ok": {"en": "ok", "ja": "成功"},
+    "status_failed": {"en": "failed", "ja": "失敗"},
+    "no_images_converted": {"en": "No images converted.", "ja": "変換済みの画像がありません。"},
+    "no_png_outputs": {"en": "No PNG outputs available.", "ja": "PNG 出力がありません。"},
+    "zip_png_ready": {"en": "ZIP (PNG) ready.", "ja": "ZIP (PNG) の準備ができました。"},
+    "no_sc2_outputs": {"en": "No SC2 outputs available.", "ja": "SC2 出力がありません。"},
+    "zip_sc2_ready": {"en": "ZIP (SC2) ready.", "ja": "ZIP (SC2) の準備ができました。"},
+    "no_sc2_pack": {"en": "No SC2 outputs to pack.", "ja": "パックする SC2 出力がありません。"},
+    "all_sc2_exceed": {
+        "en": "All SC2 files exceed disk capacity.",
+        "ja": "すべての SC2 ファイルがディスク容量を超えています。",
+    },
+    "failed_create_dsk": {"en": "Failed to create DSK", "ja": "DSK 作成に失敗"},
+    "excluded_size": {"en": "Excluded due to size", "ja": "サイズ超過で除外"},
+    "zip_dsk_ready": {"en": "ZIP (DSK) ready.", "ja": "ZIP (DSK) の準備ができました。"},
+    "rom_limit": {
+        "en": "Only the first two SC2 files are used for 32K ROM.",
+        "ja": "32K ROM では最初の 2 つの SC2 ファイルのみ使用します。",
+    },
+    "failed_create_rom": {"en": "Failed to create ROM", "ja": "ROM 作成に失敗"},
+    "zip_rom_ready": {"en": "ZIP (32K ROM) ready.", "ja": "ZIP (32K ROM) の準備ができました。"},
+    "not_implemented": {
+        "en": "Selected output is not implemented.",
+        "ja": "選択された出力は未対応です。",
+    },
+}
+
+
+def t(key: str, lang: str) -> str:
+    return I18N.get(key, {}).get(lang, key)
+
+
+def palette_choices(lang: str) -> List[Tuple[str, str]]:
+    return [(f"{t('color_label', lang)} {i}", str(i)) for i in range(1, 16)]
+
 
 def ensure_executables() -> None:
     for binary in [MSX1PQ_BIN, BASIC_VIEWER_BIN, ROM_CREATOR_BIN]:
@@ -51,6 +157,7 @@ class AppState:
     images: List[ImageRecord] = field(default_factory=list)
     selected_index: int = 0
     lut_path: Optional[Path] = None
+    language: str = "ja"
 
     def has_images(self) -> bool:
         return bool(self.images)
@@ -302,7 +409,7 @@ def update_single(
     state: AppState,
 ):
     if not state.images:
-        return None, "No images uploaded."
+        return None, t("no_images_uploaded", state.language)
 
     if lut_file is not None:
         lut_dest = UPLOAD_DIR / f"lut_{uuid.uuid4()}_{Path(lut_file.name).name}"
@@ -335,7 +442,7 @@ def update_single(
     }
     record = state.current_image()
     if record is None:
-        return None, "No selected image."
+        return None, t("no_selected_image", state.language)
     png_path, _, logs = convert_image(record, params, state.lut_path)
     return str(png_path) if png_path else None, logs
 
@@ -345,11 +452,11 @@ def convert_all(
 ) -> Tuple[str, List[ImageRecord]]:
     logs = []
     if not state.images:
-        return "No images to process.", state.images
+        return t("no_images_process", state.language), state.images
 
     for record in state.images:
         png_path, sc2_path, rec_logs = convert_image(record, params, state.lut_path)
-        status = "ok" if png_path else "failed"
+        status = t("status_ok", state.language) if png_path else t("status_failed", state.language)
         logs.append(f"{record.name}: {status}\n{rec_logs}")
     return "\n\n".join(logs), state.images
 
@@ -409,6 +516,58 @@ def batch_run(
     return log_text, gr.update(interactive=True)
 
 
+def change_language(lang: str, state: AppState):
+    state.language = lang
+    palette = palette_choices(lang)
+    batch_choices = [
+        (t("batch_zip_png", lang), "png"),
+        (t("batch_zip_sc2", lang), "sc2"),
+        (t("batch_zip_dsk", lang), "dsk"),
+        (t("batch_zip_rom32k", lang), "rom32k"),
+    ]
+    return (
+        state,
+        gr.update(value=t("heading_title", lang)),
+        gr.update(value=t("heading_basic", lang)),
+        gr.update(label=t("color_system_label", lang), info=t("color_system_info", lang)),
+        gr.update(label=t("eight_dot_label", lang), info=t("eight_dot_info", lang)),
+        gr.update(label=t("distance_label", lang), info=t("distance_info", lang)),
+        gr.update(label=t("dither_label", lang), info=t("dither_info", lang)),
+        gr.update(label=t("dark_dither_label", lang), info=t("dark_dither_info", lang)),
+        gr.update(label=t("preprocess_section", lang)),
+        gr.update(label=t("preprocessing_label", lang), info=t("preprocessing_info", lang)),
+        gr.update(label=t("posterize_label", lang), info=t("posterize_info", lang)),
+        gr.update(label=t("saturation_label", lang), info=t("saturation_info", lang)),
+        gr.update(label=t("gamma_label", lang), info=t("gamma_info", lang)),
+        gr.update(label=t("contrast_label", lang), info=t("contrast_info", lang)),
+        gr.update(label=t("hue_label", lang), info=t("hue_info", lang)),
+        gr.update(label=t("lut_section", lang)),
+        gr.update(label=t("lut_label", lang)),
+        gr.update(label=t("weights_section", lang)),
+        gr.update(label=t("weight_h_label", lang), info=t("weight_info", lang)),
+        gr.update(label=t("weight_s_label", lang), info=t("weight_info", lang)),
+        gr.update(label=t("weight_v_label", lang), info=t("weight_info", lang)),
+        gr.update(label=t("weight_r_label", lang), info=t("weight_info", lang)),
+        gr.update(label=t("weight_g_label", lang), info=t("weight_info", lang)),
+        gr.update(label=t("weight_b_label", lang), info=t("weight_info", lang)),
+        gr.update(label=t("palette_label", lang), choices=palette),
+        gr.update(label=t("upload_label", lang)),
+        gr.update(label=t("gallery_label", lang)),
+        gr.update(label=t("orig_label", lang)),
+        gr.update(label=t("result_label", lang)),
+        gr.update(value=t("update_button", lang)),
+        gr.update(value=t("batch_button", lang)),
+        gr.update(label=t("download_png", lang)),
+        gr.update(label=t("download_sc2", lang)),
+        gr.update(label=t("batch_section", lang)),
+        gr.update(label=t("batch_type_label", lang), choices=batch_choices),
+        gr.update(label=t("batch_download", lang)),
+        gr.update(label=t("batch_status", lang)),
+        gr.update(label=t("logs", lang)),
+        gr.update(label=t("language_label", lang)),
+    )
+
+
 def zip_files(file_paths: List[Path], zip_name: str) -> Path:
     ZIP_DIR.mkdir(parents=True, exist_ok=True)
     zip_path = ZIP_DIR / zip_name
@@ -424,26 +583,26 @@ def zip_files(file_paths: List[Path], zip_name: str) -> Path:
 
 def prepare_zip(selection: str, state: AppState) -> Tuple[Optional[str], str]:
     if not state.images:
-        return None, "No images converted."
+        return None, t("no_images_converted", state.language)
     msgs = []
     selection = selection or ""
     if selection == "png":
         paths = [rec.output_png() for rec in state.images if rec.output_png()]
         if not paths:
-            return None, "No PNG outputs available."
+            return None, t("no_png_outputs", state.language)
         zip_path = zip_files([Path(p) for p in paths], "batch_png.zip")
-        return str(zip_path), "ZIP (PNG) ready."
+        return str(zip_path), t("zip_png_ready", state.language)
     elif selection == "sc2":
         paths = [rec.output_sc2() for rec in state.images if rec.output_sc2()]
         if not paths:
-            return None, "No SC2 outputs available."
+            return None, t("no_sc2_outputs", state.language)
         zip_path = zip_files([Path(p) for p in paths], "batch_sc2.zip")
-        return str(zip_path), "ZIP (SC2) ready."
+        return str(zip_path), t("zip_sc2_ready", state.language)
     elif selection == "dsk":
         sc2_paths = [rec.output_sc2() for rec in state.images if rec.output_sc2()]
         sc2_paths = [Path(p) for p in sc2_paths if p]
         if not sc2_paths:
-            return None, "No SC2 outputs to pack."
+            return None, t("no_sc2_pack", state.language)
         included: List[Path] = []
         total = 0
         excluded = []
@@ -455,7 +614,7 @@ def prepare_zip(selection: str, state: AppState) -> Tuple[Optional[str], str]:
             included.append(path)
             total += size
         if not included:
-            return None, "All SC2 files exceed disk capacity."
+            return None, t("all_sc2_exceed", state.language)
         dsk_out = OUTPUT_DIR / f"disk_{uuid.uuid4()}.dsk"
         args = [str(BASIC_VIEWER_BIN), "-o", str(dsk_out)] + [str(p) for p in included]
         try:
@@ -464,19 +623,19 @@ def prepare_zip(selection: str, state: AppState) -> Tuple[Optional[str], str]:
             if result.stderr:
                 msgs.append(result.stderr)
         except subprocess.CalledProcessError as exc:
-            msgs.append(f"Failed to create DSK: {exc.stderr or exc.stdout}")
+            msgs.append(f"{t('failed_create_dsk', state.language)}: {exc.stderr or exc.stdout}")
             return None, "\n".join(msgs)
         if excluded:
-            msgs.append(f"Excluded due to size: {', '.join(excluded)}")
+            msgs.append(f"{t('excluded_size', state.language)}: {', '.join(excluded)}")
         zip_path = zip_files([dsk_out], "batch_dsk.zip")
-        return str(zip_path), "\n".join(msgs) or "ZIP (DSK) ready."
+        return str(zip_path), "\n".join(msgs) or t("zip_dsk_ready", state.language)
     elif selection == "rom32k":
         sc2_paths = [rec.output_sc2() for rec in state.images if rec.output_sc2()]
         sc2_paths = [Path(p) for p in sc2_paths if p]
         if not sc2_paths:
-            return None, "No SC2 outputs to pack."
+            return None, t("no_sc2_pack", state.language)
         if len(sc2_paths) > 2:
-            msgs.append("Only the first two SC2 files are used for 32K ROM.")
+            msgs.append(t("rom_limit", state.language))
             sc2_paths = sc2_paths[:2]
         rom_out = OUTPUT_DIR / f"rom32k_{uuid.uuid4()}.rom"
         args = [str(ROM_CREATOR_BIN), "-o", str(rom_out)] + [str(p) for p in sc2_paths]
@@ -486,153 +645,213 @@ def prepare_zip(selection: str, state: AppState) -> Tuple[Optional[str], str]:
             if result.stderr:
                 msgs.append(result.stderr)
         except subprocess.CalledProcessError as exc:
-            msgs.append(f"Failed to create ROM: {exc.stderr or exc.stdout}")
+            msgs.append(f"{t('failed_create_rom', state.language)}: {exc.stderr or exc.stdout}")
             return None, "\n".join(msgs)
         zip_path = zip_files([rom_out], "batch_rom32k.zip")
-        return str(zip_path), "\n".join(msgs) or "ZIP (32K ROM) ready."
+        return str(zip_path), "\n".join(msgs) or t("zip_rom_ready", state.language)
     else:
-        return None, "Selected output is not implemented."
+        return None, t("not_implemented", state.language)
 
 
 def launch_app():
     ensure_executables()
 
+    default_lang = "ja"
+
     with gr.Blocks(title="MMSXX MSX1 Palette Quantizer") as demo:
-        state = gr.State(AppState())
+        state = gr.State(AppState(language=default_lang))
 
-        gr.Markdown("# MMSXX MSX1 Palette Quantizer for Hugging Face Spaces")
+        with gr.Row():
+            language_selector = gr.Dropdown(
+                label=t("language_label", default_lang),
+                choices=["ja", "en"],
+                value=default_lang,
+            )
 
-        gr.Markdown("### BASICパラメーターズ")
+        heading = gr.Markdown(t("heading_title", default_lang))
+
+        basic_heading = gr.Markdown(t("heading_basic", default_lang))
         with gr.Row():
             color_system = gr.Dropdown(
-                label="Color System",
+                label=t("color_system_label", default_lang),
                 choices=["msx1", "msx2"],
                 value="msx1",
-                info="CLI default is msx1",
+                info=t("color_system_info", default_lang),
             )
             eight_dot = gr.Dropdown(
-                label="8dot",
+                label=t("eight_dot_label", default_lang),
                 choices=["none", "fast", "basic", "best", "best-attr", "best-trans"],
                 value="best",
-                info="CLI default is best",
+                info=t("eight_dot_info", default_lang),
             )
             distance = gr.Dropdown(
-                label="Distance",
+                label=t("distance_label", default_lang),
                 choices=["rgb", "hsv"],
                 value="rgb",
-                info="CLI default is rgb",
+                info=t("distance_info", default_lang),
             )
             dither = gr.Checkbox(
-                label="Dither",
+                label=t("dither_label", default_lang),
                 value=True,
-                info="Default ON (CLI)",
+                info=t("dither_info", default_lang),
             )
             dark_dither = gr.Checkbox(
-                label="Dark dither",
+                label=t("dark_dither_label", default_lang),
                 value=True,
-                info="Default ON (CLI)",
+                info=t("dark_dither_info", default_lang),
             )
 
-        with gr.Accordion("Preprocess adjustments", open=False):
+        with gr.Accordion(t("preprocess_section", default_lang), open=False) as preprocess_section:
             with gr.Row():
                 preprocessing = gr.Checkbox(
-                    label="Preprocessing",
+                    label=t("preprocessing_label", default_lang),
                     value=True,
-                    info="Default ON (CLI). Turn off to skip preprocessing (--no-preprocess).",
+                    info=t("preprocessing_info", default_lang),
                 )
                 posterize = gr.Number(
-                    label="Posterize before processing",
+                    label=t("posterize_label", default_lang),
                     value=16,
                     minimum=0,
                     maximum=255,
                     step=1,
-                    info="CLI default 16 (ignored if <=1)",
+                    info=t("posterize_info", default_lang),
                 )
                 saturation = gr.Number(
-                    label="Pre-saturation",
+                    label=t("saturation_label", default_lang),
                     value=0.0,
                     minimum=0,
                     maximum=10,
                     step=0.01,
-                    info="CLI default 0.0",
+                    info=t("saturation_info", default_lang),
                 )
                 gamma = gr.Number(
-                    label="Pre-gamma",
+                    label=t("gamma_label", default_lang),
                     value=1.0,
                     minimum=0,
                     maximum=10,
                     step=0.01,
-                    info="CLI default 1.0",
+                    info=t("gamma_info", default_lang),
                 )
                 contrast = gr.Number(
-                    label="Pre-contrast",
+                    label=t("contrast_label", default_lang),
                     value=1.0,
                     minimum=0,
                     maximum=10,
                     step=0.01,
-                    info="CLI default 1.0",
+                    info=t("contrast_info", default_lang),
                 )
                 hue = gr.Number(
-                    label="Pre-hue",
+                    label=t("hue_label", default_lang),
                     value=0.0,
                     minimum=-180,
                     maximum=180,
                     step=1,
-                    info="CLI default 0.0",
+                    info=t("hue_info", default_lang),
                 )
 
-            with gr.Accordion("Optional LUT", open=False):
+            with gr.Accordion(t("lut_section", default_lang), open=False) as lut_section:
                 lut_upload = gr.File(
-                    label="LUT file (optional)",
+                    label=t("lut_label", default_lang),
                     file_types=[".cube", ".txt", ".lut", ".csv"],
                     file_count="single",
                 )
 
-        with gr.Accordion("Weights", open=False):
+        with gr.Accordion(t("weights_section", default_lang), open=False) as weights_section:
             with gr.Row():
-                weight_h = gr.Number(label="HSV weight H", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
-                weight_s = gr.Number(label="HSV weight S", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
-                weight_v = gr.Number(label="HSV weight V", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
+                weight_h = gr.Number(
+                    label=t("weight_h_label", default_lang),
+                    value=1.0,
+                    minimum=0,
+                    maximum=1,
+                    step=0.01,
+                    info=t("weight_info", default_lang),
+                )
+                weight_s = gr.Number(
+                    label=t("weight_s_label", default_lang),
+                    value=1.0,
+                    minimum=0,
+                    maximum=1,
+                    step=0.01,
+                    info=t("weight_info", default_lang),
+                )
+                weight_v = gr.Number(
+                    label=t("weight_v_label", default_lang),
+                    value=1.0,
+                    minimum=0,
+                    maximum=1,
+                    step=0.01,
+                    info=t("weight_info", default_lang),
+                )
             with gr.Row():
-                weight_r = gr.Number(label="RGB weight R", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
-                weight_g = gr.Number(label="RGB weight G", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
-                weight_b = gr.Number(label="RGB weight B", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
+                weight_r = gr.Number(
+                    label=t("weight_r_label", default_lang),
+                    value=1.0,
+                    minimum=0,
+                    maximum=1,
+                    step=0.01,
+                    info=t("weight_info", default_lang),
+                )
+                weight_g = gr.Number(
+                    label=t("weight_g_label", default_lang),
+                    value=1.0,
+                    minimum=0,
+                    maximum=1,
+                    step=0.01,
+                    info=t("weight_info", default_lang),
+                )
+                weight_b = gr.Number(
+                    label=t("weight_b_label", default_lang),
+                    value=1.0,
+                    minimum=0,
+                    maximum=1,
+                    step=0.01,
+                    info=t("weight_info", default_lang),
+                )
 
         use_colors = gr.CheckboxGroup(
-            label="Palette",
-            choices=[(f"Color {i}", str(i)) for i in range(1, 16)],
+            label=t("palette_label", default_lang),
+            choices=palette_choices(default_lang),
             value=COLOR_CHOICES,
         )
 
-        upload = gr.File(label="Upload images (PNG, up to 32)", file_count="multiple", file_types=["image"])
+        upload = gr.File(
+            label=t("upload_label", default_lang),
+            file_count="multiple",
+            file_types=["image"],
+        )
 
         with gr.Row():
-            gallery = gr.Gallery(label="Images", columns=4, height=200)
+            gallery = gr.Gallery(label=t("gallery_label", default_lang), columns=4, height=200)
 
         with gr.Row():
             with gr.Column():
-                orig_preview = gr.Image(label="Original", interactive=False)
+                orig_preview = gr.Image(label=t("orig_label", default_lang), interactive=False)
             with gr.Column():
-                result_preview = gr.Image(label="Converted (PNG)", interactive=False)
+                result_preview = gr.Image(label=t("result_label", default_lang), interactive=False)
 
         with gr.Row():
-            update_btn = gr.Button("更新 / Update", variant="primary", interactive=False)
-            batch_btn = gr.Button("バッチ実行 / Batch convert", variant="secondary", interactive=False)
+            update_btn = gr.Button(t("update_button", default_lang), variant="primary", interactive=False)
+            batch_btn = gr.Button(t("batch_button", default_lang), variant="secondary", interactive=False)
 
         with gr.Row():
-            download_png = gr.DownloadButton(label="Download PNG", interactive=False)
-            download_sc2 = gr.DownloadButton(label="Download SC2", interactive=False)
+            download_png = gr.DownloadButton(label=t("download_png", default_lang), interactive=False)
+            download_sc2 = gr.DownloadButton(label=t("download_sc2", default_lang), interactive=False)
 
-        with gr.Accordion("Batch download", open=True):
+        with gr.Accordion(t("batch_section", default_lang), open=True) as batch_section:
             batch_type = gr.Radio(
-                label="Download type",
-                choices=[("zip(png)", "png"), ("zip(sc2)", "sc2"), ("zip(dsk)", "dsk"), ("zip(32krom)", "rom32k")],
+                label=t("batch_type_label", default_lang),
+                choices=[
+                    (t("batch_zip_png", default_lang), "png"),
+                    (t("batch_zip_sc2", default_lang), "sc2"),
+                    (t("batch_zip_dsk", default_lang), "dsk"),
+                    (t("batch_zip_rom32k", default_lang), "rom32k"),
+                ],
                 value="png",
             )
-            batch_download = gr.DownloadButton(label="Download batch ZIP", interactive=False)
-            batch_message = gr.Textbox(label="Batch status", interactive=False)
+            batch_download = gr.DownloadButton(label=t("batch_download", default_lang), interactive=False)
+            batch_message = gr.Textbox(label=t("batch_status", default_lang), interactive=False)
 
-        logs_box = gr.Textbox(label="Logs", lines=10, interactive=False)
+        logs_box = gr.Textbox(label=t("logs", default_lang), lines=10, interactive=False)
 
         upload.change(
             handle_upload,
@@ -751,6 +970,52 @@ def launch_app():
             prepare_batch_zip,
             inputs=[batch_type, state],
             outputs=[batch_download, batch_message],
+        )
+
+        language_selector.change(
+            change_language,
+            inputs=[language_selector, state],
+            outputs=[
+                state,
+                heading,
+                basic_heading,
+                color_system,
+                eight_dot,
+                distance,
+                dither,
+                dark_dither,
+                preprocess_section,
+                preprocessing,
+                posterize,
+                saturation,
+                gamma,
+                contrast,
+                hue,
+                lut_section,
+                lut_upload,
+                weights_section,
+                weight_h,
+                weight_s,
+                weight_v,
+                weight_r,
+                weight_g,
+                weight_b,
+                use_colors,
+                upload,
+                gallery,
+                orig_preview,
+                result_preview,
+                update_btn,
+                batch_btn,
+                download_png,
+                download_sc2,
+                batch_section,
+                batch_type,
+                batch_download,
+                batch_message,
+                logs_box,
+                language_selector,
+            ],
         )
 
     return demo
