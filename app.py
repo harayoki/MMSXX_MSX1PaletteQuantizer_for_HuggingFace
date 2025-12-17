@@ -128,6 +128,38 @@ def build_palette_css() -> str:
 
 CUSTOM_CSS = build_palette_css()
 
+LOCAL_STORAGE_BRIDGE = """
+<script>
+(() => {
+  const KEY = "msx1pq_settings_json";
+  const findInput = () => {
+    const root = gradioApp();
+    if (!root) return null;
+    return root.querySelector("#local-settings-json textarea, #local-settings-json input");
+  };
+
+  const sync = () => {
+    const el = findInput();
+    if (!el || el.dataset.synced === "1") return;
+    el.dataset.synced = "1";
+    const saved = window.localStorage.getItem(KEY);
+    if (saved) {
+      el.value = saved;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    el.addEventListener("input", () => {
+      window.localStorage.setItem(KEY, el.value || "");
+    });
+  };
+
+  const observer = new MutationObserver(sync);
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  sync();
+})();
+</script>
+"""
+
 
 SETTINGS_FORMAT_VERSION = 1
 
@@ -160,15 +192,38 @@ class SettingManager:
     STRING_KEYS = {"color_system", "eight_dot", "distance"}
     KNOWN_KEYS = BOOL_KEYS | NUMERIC_KEYS | LIST_KEYS | STRING_KEYS
 
-    def __init__(self, profiles: List[SettingProfile], errors: Optional[List[str]] = None):
-        self.profiles = profiles
-        self.profile_map = {profile.key: profile for profile in profiles}
-        self.errors = errors or []
+    def __init__(
+        self,
+        profiles: List[SettingProfile],
+        errors: Optional[List[str]] = None,
+        profile_errors: Optional[Dict[str, List[str]]] = None,
+    ):
+        self.profiles = profiles or [SettingProfile("default", "Default", "", {}, True)]
+        self.profile_map = {profile.key: profile for profile in self.profiles}
+        self.global_errors = errors or []
+        self.profile_errors = profile_errors or {}
 
     @classmethod
     def from_file(cls, path: Path) -> "SettingManager":
         errors: List[str] = []
-        data = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            raw_text = path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return cls([], [f"Settings file not found: {path}"])
+        except OSError as exc:
+            return cls([], [f"Failed to read settings: {exc}"])
+
+        try:
+            data = json.loads(raw_text)
+        except json.JSONDecodeError as exc:
+            return cls([], [f"Invalid JSON: {exc}"])
+
+        return cls.from_dict(data, errors)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, object], errors: Optional[List[str]] = None) -> "SettingManager":
+        errors = errors or []
+        profile_errors: Dict[str, List[str]] = {}
         version = data.get("format_version", 1)
         if version != SETTINGS_FORMAT_VERSION:
             errors.append(
@@ -179,17 +234,35 @@ class SettingManager:
         for idx, raw in enumerate(data.get("profiles", [])):
             if raw.get("enabled", True) is False:
                 continue
-            values = cls._sanitize_values(raw.get("values", {}), errors, raw.get("name") or f"Profile {idx + 1}")
+            local_errors: List[str] = []
+            values = cls._sanitize_values(raw.get("values", {}), local_errors, raw.get("name") or f"Profile {idx + 1}")
+            key = raw.get("key", "") or f"profile-{idx}"
+            profile_errors[key] = local_errors
             profiles.append(
                 SettingProfile(
-                    key=raw.get("key", ""),
+                    key=key,
                     name=raw.get("name", ""),
                     description=raw.get("description", ""),
                     values=values,
                     enabled=raw.get("enabled", True),
                 )
             )
-        return cls(profiles, errors)
+        return cls(profiles, errors, profile_errors)
+
+    def to_dict(self) -> Dict[str, object]:
+        return {
+            "format_version": SETTINGS_FORMAT_VERSION,
+            "profiles": [
+                {
+                    "key": profile.key,
+                    "name": profile.name,
+                    "description": profile.description,
+                    "enabled": profile.enabled,
+                    "values": profile.values,
+                }
+                for profile in self.profiles
+            ],
+        }
 
     @classmethod
     def _sanitize_values(
@@ -250,7 +323,7 @@ class SettingManager:
 
     @property
     def choices(self) -> List[Tuple[str, str]]:
-        return [(profile.name, profile.key) for profile in self.profiles]
+        return [(profile.name or profile.key or "(unnamed)", profile.key) for profile in self.profiles]
 
     def values_for(self, profile: Optional[SettingProfile]) -> Dict[str, Union[str, bool, float, List[Union[str, int]], None]]:
         if profile is None:
@@ -258,6 +331,11 @@ class SettingManager:
         merged = self.default_profile.values.copy()
         merged.update(profile.values)
         return merged
+
+    def errors_for(self, profile: Optional[SettingProfile]) -> List[str]:
+        if profile is None:
+            return []
+        return self.profile_errors.get(profile.key, [])
 
 
 SETTINGS_MANAGER = SettingManager.from_file(SETTINGS_JSON)
@@ -376,6 +454,14 @@ I18N = {
         "ja": "選択された出力は未対応です。",
     },
     "profile_loaded": {"en": "Profile loaded.", "ja": "設定を読み込みました。"},
+    "settings_title": {"en": "Profile title", "ja": "設定タイトル"},
+    "settings_description": {"en": "Profile description", "ja": "設定説明"},
+    "settings_import": {"en": "Load settings (JSON)", "ja": "設定を読み込む (JSON)"},
+    "settings_export": {"en": "Export settings (JSON)", "ja": "設定を書き出す (JSON)"},
+    "settings_loaded": {"en": "Settings loaded.", "ja": "設定を読み込みました。"},
+    "settings_saved": {"en": "Settings saved to browser.", "ja": "設定をブラウザに保存しました。"},
+    "profile_updated": {"en": "Profile title/description updated.", "ja": "設定のタイトルと説明を更新しました。"},
+    "settings_invalid": {"en": "Failed to load settings.", "ja": "設定の読み込みに失敗しました。"},
 }
 
 
@@ -401,6 +487,10 @@ def profile_value(values: Dict[str, Union[str, bool, float, List[Union[str, int]
     if key not in values:
         return fallback
     return values.get(key)
+
+
+def current_settings_json() -> str:
+    return json.dumps(SETTINGS_MANAGER.to_dict(), ensure_ascii=False, indent=2)
 
 
 def append_log(log_text: str, level: str, message: str) -> str:
@@ -836,6 +926,10 @@ def change_language(lang: str, state: AppState):
     return (
         state,
         gr.update(value=t("heading_title", lang)),
+        gr.update(label=t("settings_title", lang)),
+        gr.update(label=t("settings_description", lang)),
+        gr.update(label=t("settings_import", lang)),
+        gr.update(label=t("settings_export", lang)),
         gr.update(label=t("upload_section", lang)),
         gr.update(label=t("upload_label", lang)),
         gr.update(label=t("preprocess_section", lang)),
@@ -878,14 +972,30 @@ def change_language(lang: str, state: AppState):
     )
 
 
-def apply_profile(profile_key: str, state: AppState, logs_text: str):
-    profile = SETTINGS_MANAGER.get_profile(profile_key) or SETTINGS_MANAGER.default_profile
+def build_profile_outputs(
+    profile: SettingProfile, state: AppState, logs_text: str, base_message: Optional[str] = None
+):
     state.profile_key = profile.key
     values = SETTINGS_MANAGER.values_for(profile)
-    message = f"{t('profile_loaded', state.language)}: {profile.name}"
+    logs = logs_text
+    overlay_message: Optional[str] = base_message
+    overlay_level = "info"
+
+    if base_message:
+        logs = append_log(logs, "info", base_message)
+
+    profile_errors = SETTINGS_MANAGER.errors_for(profile)
+    if profile_errors:
+        overlay_message = "; ".join(profile_errors)
+        overlay_level = "error"
+        for err in profile_errors:
+            logs = append_log(logs, "error", err)
+
     return (
         state,
         profile_summary(profile),
+        gr.update(value=profile.name),
+        gr.update(value=profile.description),
         gr.update(value=profile_value(values, "color_system", "msx1")),
         gr.update(value=profile_value(values, "eight_dot", "best")),
         gr.update(value=profile_value(values, "distance", "rgb")),
@@ -904,9 +1014,126 @@ def apply_profile(profile_key: str, state: AppState, logs_text: str):
         gr.update(value=profile_value(values, "weight_g", 1.0)),
         gr.update(value=profile_value(values, "weight_b", 1.0)),
         gr.update(value=to_use_colors(values.get("use_colors"))),
-        overlay_update(message, "info"),
-        gr.update(value=append_log(logs_text, "info", message)),
+        overlay_update(overlay_message, overlay_level),
+        gr.update(value=logs),
     )
+
+
+def apply_profile(profile_key: str, state: AppState, logs_text: str):
+    profile = SETTINGS_MANAGER.get_profile(profile_key) or SETTINGS_MANAGER.default_profile
+    message = f"{t('profile_loaded', state.language)}: {profile.name}"
+    return build_profile_outputs(profile, state, logs_text, message)
+
+
+def update_settings_manager(manager: SettingManager):
+    global SETTINGS_MANAGER
+    SETTINGS_MANAGER = manager
+
+
+def selector_update_for(manager: SettingManager, selected_key: Optional[str] = None):
+    target_key = selected_key or manager.default_profile.key
+    return gr.update(choices=manager.choices, value=target_key)
+
+
+def load_settings_from_text(raw_text: str, state: AppState, logs_text: str):
+    if not raw_text:
+        current_profile = SETTINGS_MANAGER.get_profile(state.profile_key) or SETTINGS_MANAGER.default_profile
+        outputs = build_profile_outputs(current_profile, state, logs_text)
+        return (
+            outputs[0],
+            selector_update_for(SETTINGS_MANAGER, current_profile.key),
+            *outputs[1:],
+            gr.update(value=""),
+        )
+
+    try:
+        data = json.loads(raw_text)
+    except json.JSONDecodeError as exc:
+        message = f"{t('settings_invalid', state.language)}: {exc}"
+        current_profile = SETTINGS_MANAGER.get_profile(state.profile_key) or SETTINGS_MANAGER.default_profile
+        outputs = build_profile_outputs(current_profile, state, append_log(logs_text, "error", message))
+        return (
+            outputs[0],
+            selector_update_for(SETTINGS_MANAGER, current_profile.key),
+            *outputs[1:],
+            gr.update(value=raw_text),
+        )
+
+    if not isinstance(data, dict):
+        message = f"{t('settings_invalid', state.language)}: root must be an object"
+        current_profile = SETTINGS_MANAGER.get_profile(state.profile_key) or SETTINGS_MANAGER.default_profile
+        outputs = build_profile_outputs(current_profile, state, append_log(logs_text, "error", message))
+        return (
+            outputs[0],
+            selector_update_for(SETTINGS_MANAGER, current_profile.key),
+            *outputs[1:],
+            gr.update(value=raw_text),
+        )
+
+    manager = SettingManager.from_dict(data)
+    update_settings_manager(manager)
+    profile = SETTINGS_MANAGER.default_profile
+
+    logs = logs_text
+    for err in SETTINGS_MANAGER.global_errors:
+        logs = append_log(logs, "error", err)
+
+    outputs = build_profile_outputs(profile, state, logs, t("settings_loaded", state.language))
+    return (
+        outputs[0],
+        selector_update_for(SETTINGS_MANAGER, profile.key),
+        *outputs[1:],
+        gr.update(value=current_settings_json()),
+    )
+
+
+def load_settings_file(file: Optional[gr.File], state: AppState, logs_text: str):
+    if file is None:
+        current_profile = SETTINGS_MANAGER.get_profile(state.profile_key) or SETTINGS_MANAGER.default_profile
+        outputs = build_profile_outputs(current_profile, state, logs_text)
+        return (
+            outputs[0],
+            selector_update_for(SETTINGS_MANAGER, current_profile.key),
+            *outputs[1:],
+            gr.update(value=current_settings_json()),
+        )
+
+    temp_path = Path(file.name)
+    try:
+        raw_text = temp_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        message = f"{t('settings_invalid', state.language)}: {exc}"
+        outputs = build_profile_outputs(SETTINGS_MANAGER.default_profile, state, append_log(logs_text, "error", message))
+        return (
+            outputs[0],
+            selector_update_for(SETTINGS_MANAGER, SETTINGS_MANAGER.default_profile.key),
+            *outputs[1:],
+            gr.update(value=current_settings_json()),
+        )
+
+    return load_settings_from_text(raw_text, state, logs_text)
+
+
+def update_profile_metadata(title: str, description: str, state: AppState, logs_text: str):
+    profile = SETTINGS_MANAGER.get_profile(state.profile_key) or SETTINGS_MANAGER.default_profile
+    profile.name = title
+    profile.description = description
+    SETTINGS_MANAGER.profile_map[profile.key] = profile
+    logs = append_log(logs_text, "info", t("profile_updated", state.language))
+    outputs = build_profile_outputs(profile, state, logs)
+    return (
+        outputs[0],
+        selector_update_for(SETTINGS_MANAGER, profile.key),
+        *outputs[1:],
+        gr.update(value=current_settings_json()),
+    )
+
+
+def export_settings(state: AppState, logs_text: str):
+    export_path = BASE_TEMP / f"settings_export_{uuid.uuid4().hex}.json"
+    export_path.write_text(current_settings_json(), encoding="utf-8")
+    logs = append_log(logs_text, "info", t("settings_saved", state.language))
+    return str(export_path), overlay_update(t("settings_saved", state.language), "info"), gr.update(value=logs), gr.update(value=current_settings_json())
 
 
 def zip_files(file_paths: List[Path], zip_name: str) -> Path:
@@ -1018,7 +1245,22 @@ def launch_app():
                 value=default_lang,
             )
 
-        initial_overlay = render_overlay("; ".join(SETTINGS_MANAGER.errors), "error") if SETTINGS_MANAGER.errors else ""
+        with gr.Row():
+            profile_title = gr.Textbox(label=t("settings_title", default_lang), value=default_profile.name)
+            profile_description = gr.Textbox(
+                label=t("settings_description", default_lang), value=default_profile.description
+            )
+
+        with gr.Row():
+            settings_file = gr.File(label=t("settings_import", default_lang), file_types=[".json"], file_count="single")
+            settings_download = gr.DownloadButton(label=t("settings_export", default_lang))
+
+        settings_storage = gr.Textbox(value=current_settings_json(), visible=False, elem_id="local-settings-json")
+        storage_helper = gr.HTML(value=LOCAL_STORAGE_BRIDGE, visible=False)
+
+        initial_overlay = (
+            render_overlay("; ".join(SETTINGS_MANAGER.global_errors), "error") if SETTINGS_MANAGER.global_errors else ""
+        )
         overlay_box = gr.HTML(value=initial_overlay, show_label=False)
 
         heading = gr.Markdown(t("heading_title", default_lang))
@@ -1208,7 +1450,7 @@ def launch_app():
             batch_message = gr.Textbox(label=t("batch_status", default_lang), interactive=False)
 
         initial_logs = ""
-        for err in SETTINGS_MANAGER.errors:
+        for err in SETTINGS_MANAGER.global_errors:
             initial_logs = append_log(initial_logs, "error", err)
         logs_box = gr.Textbox(label=t("logs", default_lang), lines=10, interactive=False, value=initial_logs)
 
@@ -1339,6 +1581,8 @@ def launch_app():
             outputs=[
                 state,
                 profile_label,
+                profile_title,
+                profile_description,
                 color_system,
                 eight_dot,
                 distance,
@@ -1362,12 +1606,154 @@ def launch_app():
             ],
         )
 
+        settings_file.change(
+            load_settings_file,
+            inputs=[settings_file, state, logs_box],
+            outputs=[
+                state,
+                settings_selector,
+                profile_label,
+                profile_title,
+                profile_description,
+                color_system,
+                eight_dot,
+                distance,
+                dither,
+                dark_dither,
+                preprocessing,
+                posterize,
+                saturation,
+                gamma,
+                contrast,
+                hue,
+                weight_h,
+                weight_s,
+                weight_v,
+                weight_r,
+                weight_g,
+                weight_b,
+                use_colors,
+                overlay_box,
+                logs_box,
+                settings_storage,
+            ],
+        )
+
+        settings_storage.change(
+            load_settings_from_text,
+            inputs=[settings_storage, state, logs_box],
+            outputs=[
+                state,
+                settings_selector,
+                profile_label,
+                profile_title,
+                profile_description,
+                color_system,
+                eight_dot,
+                distance,
+                dither,
+                dark_dither,
+                preprocessing,
+                posterize,
+                saturation,
+                gamma,
+                contrast,
+                hue,
+                weight_h,
+                weight_s,
+                weight_v,
+                weight_r,
+                weight_g,
+                weight_b,
+                use_colors,
+                overlay_box,
+                logs_box,
+                settings_storage,
+            ],
+        )
+
+        profile_title.change(
+            update_profile_metadata,
+            inputs=[profile_title, profile_description, state, logs_box],
+            outputs=[
+                state,
+                settings_selector,
+                profile_label,
+                profile_title,
+                profile_description,
+                color_system,
+                eight_dot,
+                distance,
+                dither,
+                dark_dither,
+                preprocessing,
+                posterize,
+                saturation,
+                gamma,
+                contrast,
+                hue,
+                weight_h,
+                weight_s,
+                weight_v,
+                weight_r,
+                weight_g,
+                weight_b,
+                use_colors,
+                overlay_box,
+                logs_box,
+                settings_storage,
+            ],
+        )
+
+        profile_description.change(
+            update_profile_metadata,
+            inputs=[profile_title, profile_description, state, logs_box],
+            outputs=[
+                state,
+                settings_selector,
+                profile_label,
+                profile_title,
+                profile_description,
+                color_system,
+                eight_dot,
+                distance,
+                dither,
+                dark_dither,
+                preprocessing,
+                posterize,
+                saturation,
+                gamma,
+                contrast,
+                hue,
+                weight_h,
+                weight_s,
+                weight_v,
+                weight_r,
+                weight_g,
+                weight_b,
+                use_colors,
+                overlay_box,
+                logs_box,
+                settings_storage,
+            ],
+        )
+
+        settings_download.click(
+            export_settings,
+            inputs=[state, logs_box],
+            outputs=[settings_download, overlay_box, logs_box, settings_storage],
+        )
+
         language_selector.change(
             change_language,
             inputs=[language_selector, state],
             outputs=[
                 state,
                 heading,
+                profile_title,
+                profile_description,
+                settings_file,
+                settings_download,
                 upload_section,
                 upload,
                 preprocess_section,
