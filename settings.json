@@ -1,0 +1,57 @@
+{
+  "format_version": 1,
+  "profiles": [
+    {
+      "key": "default",
+      "name": "Default",
+      "description": "標準の前処理とCLI既定値。",
+      "enabled": true,
+      "values": {
+        "color_system": "msx1",
+        "dither": true,
+        "dark_dither": true,
+        "eight_dot": "best",
+        "distance": "rgb",
+        "preprocess": true,
+        "posterize": 16,
+        "saturation": 0.0,
+        "gamma": 1.0,
+        "contrast": 1.0,
+        "hue": 0.0,
+        "weight_h": 1.0,
+        "weight_s": 1.0,
+        "weight_v": 1.0,
+        "weight_r": 1.0,
+        "weight_g": 1.0,
+        "weight_b": 1.0,
+        "use_colors": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"]
+      }
+    },
+    {
+      "key": "passthrough",
+      "name": "パススルー",
+      "description": "前処理を行わずに入力をそのまま処理します。",
+      "enabled": true,
+      "values": {
+        "color_system": "msx1",
+        "dither": true,
+        "dark_dither": true,
+        "eight_dot": "best",
+        "distance": "rgb",
+        "preprocess": false,
+        "posterize": null,
+        "saturation": null,
+        "gamma": null,
+        "contrast": null,
+        "hue": null,
+        "weight_h": 1.0,
+        "weight_s": 1.0,
+        "weight_v": 1.0,
+        "weight_r": 1.0,
+        "weight_g": 1.0,
+        "weight_b": 1.0,
+        "use_colors": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"]
+      }
+    }
+  ]
+}

@@ -1,3 +1,5 @@
+import html
+import json
 import shutil
 import subprocess
 import tempfile
@@ -13,6 +15,7 @@ BIN_DIR = ROOT_DIR / "bin"
 MSX1PQ_BIN = BIN_DIR / "msx1pq_cli"
 BASIC_VIEWER_BIN = BIN_DIR / "basic_sc2_viewer.bin"
 ROM_CREATOR_BIN = BIN_DIR / "create_sc2_32k_rom.bin"
+SETTINGS_JSON = ROOT_DIR / "settings.json"
 
 BASE_TEMP = Path(tempfile.mkdtemp(prefix="msx1pq_app_"))
 UPLOAD_DIR = BASE_TEMP / "uploads"
@@ -66,6 +69,44 @@ def build_palette_css() -> str:
 .palette-checkboxes input[type='checkbox'] {
     accent-color: currentColor;
 }
+
+.overlay-container {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 1100;
+    pointer-events: none;
+}
+
+.overlay-card {
+    min-width: 240px;
+    max-width: min(520px, 80vw);
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid #cbd5e1;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+    font-weight: 600;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    pointer-events: auto;
+}
+
+.overlay-icon {
+    width: 18px;
+    height: 18px;
+}
+
+.overlay-info {
+    background: #ecfeff;
+    color: #0ea5e9;
+}
+
+.overlay-error {
+    background: #fff1f2;
+    color: #e11d48;
+    border-color: #fecdd3;
+}
 """
     color_blocks = []
     for idx, (r, g, b) in enumerate(PALETTE_COLORS, start=1):
@@ -78,14 +119,81 @@ def build_palette_css() -> str:
 }}
 
 .palette-checkboxes label:has(input[value=\"{idx}\"]) * {{
-    color: {text_color};
-}}
+            color: {text_color};
+        }}
 """
         )
     return base_css + "\n".join(color_blocks)
 
 
 CUSTOM_CSS = build_palette_css()
+
+
+SETTINGS_FORMAT_VERSION = 1
+
+
+@dataclass
+class SettingProfile:
+    key: str
+    name: str
+    description: str
+    values: Dict[str, Union[str, bool, float, List[Union[str, int]], None]]
+    enabled: bool = True
+
+
+class SettingManager:
+    def __init__(self, profiles: List[SettingProfile]):
+        self.profiles = profiles
+        self.profile_map = {profile.key: profile for profile in profiles}
+
+    @classmethod
+    def from_file(cls, path: Path) -> "SettingManager":
+        data = json.loads(path.read_text(encoding="utf-8"))
+        version = data.get("format_version", 1)
+        if version != SETTINGS_FORMAT_VERSION:
+            raise ValueError(
+                f"Unsupported settings format version: {version} (expected {SETTINGS_FORMAT_VERSION})"
+            )
+
+        profiles: List[SettingProfile] = []
+        for raw in data.get("profiles", []):
+            if raw.get("enabled", True) is False:
+                continue
+            profiles.append(
+                SettingProfile(
+                    key=raw.get("key", ""),
+                    name=raw.get("name", ""),
+                    description=raw.get("description", ""),
+                    values=raw.get("values", {}),
+                    enabled=raw.get("enabled", True),
+                )
+            )
+        return cls(profiles)
+
+    def get_profile(self, key: str) -> Optional[SettingProfile]:
+        return self.profile_map.get(key)
+
+    @property
+    def default_profile(self) -> SettingProfile:
+        if "default" in self.profile_map:
+            return self.profile_map["default"]
+        if not self.profiles:
+            raise ValueError("No setting profiles available")
+        return self.profiles[0]
+
+    @property
+    def choices(self) -> List[Tuple[str, str]]:
+        return [(profile.name, profile.key) for profile in self.profiles]
+
+    def values_for(self, profile: Optional[SettingProfile]) -> Dict[str, Union[str, bool, float, List[Union[str, int]], None]]:
+        if profile is None:
+            return self.default_profile.values
+        merged = self.default_profile.values.copy()
+        merged.update(profile.values)
+        return merged
+
+
+SETTINGS_MANAGER = SettingManager.from_file(SETTINGS_JSON)
 
 I18N = {
     "heading_title": {
@@ -188,6 +296,7 @@ I18N = {
         "en": "Selected output is not implemented.",
         "ja": "選択された出力は未対応です。",
     },
+    "profile_loaded": {"en": "Profile loaded.", "ja": "設定を読み込みました。"},
 }
 
 
@@ -197,6 +306,41 @@ def t(key: str, lang: str) -> str:
 
 def palette_choices(lang: str) -> List[Tuple[str, str]]:
     return [(f"#{i}", str(i)) for i in range(1, len(PALETTE_COLORS) + 1)]
+
+
+def profile_summary(profile: SettingProfile) -> str:
+    return f"**{profile.name}** — {profile.description}"
+
+
+def to_use_colors(value: Optional[List[Union[str, int]]]) -> List[str]:
+    if value is None:
+        return COLOR_CHOICES
+    return [str(v) for v in value]
+
+
+def profile_value(values: Dict[str, Union[str, bool, float, List[Union[str, int]], None]], key: str, fallback):
+    if key not in values:
+        return fallback
+    return values.get(key)
+
+
+def render_overlay(message: Optional[str], level: str = "info") -> str:
+    if not message:
+        return ""
+    level_class = "overlay-error" if level == "error" else "overlay-info"
+    icon = "⚠️" if level == "error" else "ℹ️"
+    safe_message = html.escape(message)
+    return (
+        "<div class=\"overlay-container\">"
+        f"<div class=\"overlay-card {level_class}\">"
+        f"<span class=\"overlay-icon\">{icon}</span>"
+        f"<span>{safe_message}</span>"
+        "</div></div>"
+    )
+
+
+def overlay_update(message: Optional[str], level: str = "info"):
+    return gr.update(value=render_overlay(message, level))
 
 
 def ensure_executables() -> None:
@@ -226,6 +370,7 @@ class AppState:
     selected_index: int = 0
     lut_path: Optional[Path] = None
     language: str = "ja"
+    profile_key: str = "default"
 
     def has_images(self) -> bool:
         return bool(self.images)
@@ -638,7 +783,36 @@ def change_language(lang: str, state: AppState):
         gr.update(label=t("batch_download", lang)),
         gr.update(label=t("batch_status", lang)),
         gr.update(label=t("logs", lang)),
-        gr.update(label=t("language_label", lang)),
+        gr.update(label=""),
+    )
+
+
+def apply_profile(profile_key: str, state: AppState):
+    profile = SETTINGS_MANAGER.get_profile(profile_key) or SETTINGS_MANAGER.default_profile
+    state.profile_key = profile.key
+    values = SETTINGS_MANAGER.values_for(profile)
+    return (
+        state,
+        profile_summary(profile),
+        gr.update(value=profile_value(values, "color_system", "msx1")),
+        gr.update(value=profile_value(values, "eight_dot", "best")),
+        gr.update(value=profile_value(values, "distance", "rgb")),
+        gr.update(value=profile_value(values, "dither", True)),
+        gr.update(value=profile_value(values, "dark_dither", True)),
+        gr.update(value=profile_value(values, "preprocess", True)),
+        gr.update(value=profile_value(values, "posterize", 16)),
+        gr.update(value=profile_value(values, "saturation", 0.0)),
+        gr.update(value=profile_value(values, "gamma", 1.0)),
+        gr.update(value=profile_value(values, "contrast", 1.0)),
+        gr.update(value=profile_value(values, "hue", 0.0)),
+        gr.update(value=profile_value(values, "weight_h", 1.0)),
+        gr.update(value=profile_value(values, "weight_s", 1.0)),
+        gr.update(value=profile_value(values, "weight_v", 1.0)),
+        gr.update(value=profile_value(values, "weight_r", 1.0)),
+        gr.update(value=profile_value(values, "weight_g", 1.0)),
+        gr.update(value=profile_value(values, "weight_b", 1.0)),
+        gr.update(value=to_use_colors(values.get("use_colors"))),
+        overlay_update(f"{t('profile_loaded', state.language)}: {profile.name}", "info"),
     )
 
 
@@ -731,16 +905,27 @@ def launch_app():
     ensure_executables()
 
     default_lang = "ja"
+    default_profile = SETTINGS_MANAGER.default_profile
+    default_values = SETTINGS_MANAGER.values_for(default_profile)
 
     with gr.Blocks(title="MMSXX MSX1 Palette Quantizer", css=CUSTOM_CSS) as demo:
-        state = gr.State(AppState(language=default_lang))
+        state = gr.State(AppState(language=default_lang, profile_key=default_profile.key))
 
         with gr.Row():
+            settings_selector = gr.Dropdown(
+                label="設定セット",
+                choices=SETTINGS_MANAGER.choices,
+                value=default_profile.key,
+            )
+            profile_label = gr.Markdown(profile_summary(default_profile))
             language_selector = gr.Dropdown(
-                label=t("language_label", default_lang),
-                choices=["ja", "en"],
+                label="",
+                show_label=False,
+                choices=[("lang:ja", "ja"), ("lang:en", "en")],
                 value=default_lang,
             )
+
+        overlay_box = gr.HTML(value="", show_label=False)
 
         heading = gr.Markdown(t("heading_title", default_lang))
 
@@ -755,12 +940,12 @@ def launch_app():
             with gr.Row():
                 preprocessing = gr.Checkbox(
                     label=t("preprocessing_label", default_lang),
-                    value=True,
+                    value=profile_value(default_values, "preprocess", True),
                     info=t("preprocessing_info", default_lang),
                 )
                 posterize = gr.Number(
                     label=t("posterize_label", default_lang),
-                    value=16,
+                    value=profile_value(default_values, "posterize", 16),
                     minimum=0,
                     maximum=255,
                     step=1,
@@ -768,7 +953,7 @@ def launch_app():
                 )
                 saturation = gr.Number(
                     label=t("saturation_label", default_lang),
-                    value=0.0,
+                    value=profile_value(default_values, "saturation", 0.0),
                     minimum=0,
                     maximum=10,
                     step=0.01,
@@ -776,7 +961,7 @@ def launch_app():
                 )
                 gamma = gr.Number(
                     label=t("gamma_label", default_lang),
-                    value=1.0,
+                    value=profile_value(default_values, "gamma", 1.0),
                     minimum=0,
                     maximum=10,
                     step=0.01,
@@ -784,7 +969,7 @@ def launch_app():
                 )
                 contrast = gr.Number(
                     label=t("contrast_label", default_lang),
-                    value=1.0,
+                    value=profile_value(default_values, "contrast", 1.0),
                     minimum=0,
                     maximum=10,
                     step=0.01,
@@ -792,7 +977,7 @@ def launch_app():
                 )
                 hue = gr.Number(
                     label=t("hue_label", default_lang),
-                    value=0.0,
+                    value=profile_value(default_values, "hue", 0.0),
                     minimum=-180,
                     maximum=180,
                     step=1,
@@ -811,29 +996,29 @@ def launch_app():
                 color_system = gr.Dropdown(
                     label=t("color_system_label", default_lang),
                     choices=["msx1", "msx2"],
-                    value="msx1",
+                    value=profile_value(default_values, "color_system", "msx1"),
                     info=t("color_system_info", default_lang),
                 )
                 eight_dot = gr.Dropdown(
                     label=t("eight_dot_label", default_lang),
                     choices=["none", "fast", "basic", "best", "best-attr", "best-trans"],
-                    value="best",
+                    value=profile_value(default_values, "eight_dot", "best"),
                     info=t("eight_dot_info", default_lang),
                 )
                 distance = gr.Dropdown(
                     label=t("distance_label", default_lang),
                     choices=["rgb", "hsv"],
-                    value="rgb",
+                    value=profile_value(default_values, "distance", "rgb"),
                     info=t("distance_info", default_lang),
                 )
                 dither = gr.Checkbox(
                     label=t("dither_label", default_lang),
-                    value=True,
+                    value=profile_value(default_values, "dither", True),
                     info=t("dither_info", default_lang),
                 )
                 dark_dither = gr.Checkbox(
                     label=t("dark_dither_label", default_lang),
-                    value=True,
+                    value=profile_value(default_values, "dark_dither", True),
                     info=t("dark_dither_info", default_lang),
                 )
 
@@ -841,7 +1026,7 @@ def launch_app():
                 with gr.Row():
                     weight_h = gr.Number(
                         label=t("weight_h_label", default_lang),
-                        value=1.0,
+                        value=profile_value(default_values, "weight_h", 1.0),
                         minimum=0,
                         maximum=1,
                         step=0.01,
@@ -849,7 +1034,7 @@ def launch_app():
                     )
                     weight_s = gr.Number(
                         label=t("weight_s_label", default_lang),
-                        value=1.0,
+                        value=profile_value(default_values, "weight_s", 1.0),
                         minimum=0,
                         maximum=1,
                         step=0.01,
@@ -857,7 +1042,7 @@ def launch_app():
                     )
                     weight_v = gr.Number(
                         label=t("weight_v_label", default_lang),
-                        value=1.0,
+                        value=profile_value(default_values, "weight_v", 1.0),
                         minimum=0,
                         maximum=1,
                         step=0.01,
@@ -866,7 +1051,7 @@ def launch_app():
                 with gr.Row():
                     weight_r = gr.Number(
                         label=t("weight_r_label", default_lang),
-                        value=1.0,
+                        value=profile_value(default_values, "weight_r", 1.0),
                         minimum=0,
                         maximum=1,
                         step=0.01,
@@ -874,7 +1059,7 @@ def launch_app():
                     )
                     weight_g = gr.Number(
                         label=t("weight_g_label", default_lang),
-                        value=1.0,
+                        value=profile_value(default_values, "weight_g", 1.0),
                         minimum=0,
                         maximum=1,
                         step=0.01,
@@ -882,19 +1067,19 @@ def launch_app():
                     )
                     weight_b = gr.Number(
                         label=t("weight_b_label", default_lang),
-                        value=1.0,
+                        value=profile_value(default_values, "weight_b", 1.0),
                         minimum=0,
                         maximum=1,
                         step=0.01,
                         info=t("weight_info", default_lang),
                     )
 
-            use_colors = gr.CheckboxGroup(
-                label=t("palette_label", default_lang),
-                choices=palette_choices(default_lang),
-                value=COLOR_CHOICES,
-                elem_classes=["palette-checkboxes"],
-            )
+        use_colors = gr.CheckboxGroup(
+            label=t("palette_label", default_lang),
+            choices=palette_choices(default_lang),
+            value=to_use_colors(default_values.get("use_colors")),
+            elem_classes=["palette-checkboxes"],
+        )
 
         with gr.Accordion(t("images_section", default_lang), open=False) as images_section:
             with gr.Row():
@@ -1049,6 +1234,34 @@ def launch_app():
             prepare_batch_zip,
             inputs=[batch_type, state],
             outputs=[batch_download, batch_message],
+        )
+
+        settings_selector.change(
+            apply_profile,
+            inputs=[settings_selector, state],
+            outputs=[
+                state,
+                profile_label,
+                color_system,
+                eight_dot,
+                distance,
+                dither,
+                dark_dither,
+                preprocessing,
+                posterize,
+                saturation,
+                gamma,
+                contrast,
+                hue,
+                weight_h,
+                weight_s,
+                weight_v,
+                weight_r,
+                weight_g,
+                weight_b,
+                use_colors,
+                overlay_box,
+            ],
         )
 
         language_selector.change(
