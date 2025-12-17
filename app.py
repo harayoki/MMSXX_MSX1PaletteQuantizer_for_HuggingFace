@@ -22,6 +22,7 @@ for path in (UPLOAD_DIR, OUTPUT_DIR, ZIP_DIR):
     path.mkdir(parents=True, exist_ok=True)
 
 DISK_SIZE_BYTES = 720 * 1024
+COLOR_CHOICES = [str(i) for i in range(1, 16)]
 
 
 def ensure_executables() -> None:
@@ -122,6 +123,11 @@ def build_cli_args(params: Dict[str, Optional[Union[str, bool, float, List[int]]
     return args
 
 
+def to_disabled_colors(selected_use_colors: Optional[List[str]]) -> List[int]:
+    selected_set = set(selected_use_colors or [])
+    return [int(color) for color in COLOR_CHOICES if color not in selected_set]
+
+
 def convert_image(
     record: ImageRecord,
     params: Dict[str, Optional[Union[str, bool, float, List[int]]]],
@@ -180,7 +186,7 @@ def handle_upload(
     dark_dither,
     eight_dot,
     distance,
-    no_preprocess,
+    preprocess,
     weight_h,
     weight_s,
     weight_v,
@@ -192,7 +198,7 @@ def handle_upload(
     gamma,
     contrast,
     hue,
-    disable_colors,
+    use_colors,
     lut_file,
     state: AppState,
 ):
@@ -219,7 +225,7 @@ def handle_upload(
     else:
         state.lut_path = None
 
-    selected_disable_colors = [int(val) for val in disable_colors or [] if str(val).isdigit()]
+    selected_disable_colors = to_disabled_colors(use_colors)
 
     params = {
         "color_system": color_system,
@@ -227,7 +233,7 @@ def handle_upload(
         "dark_dither": dark_dither,
         "eight_dot": eight_dot,
         "distance": distance,
-        "no_preprocess": no_preprocess,
+        "no_preprocess": not preprocess,
         "weight_h": weight_h,
         "weight_s": weight_s,
         "weight_v": weight_v,
@@ -279,7 +285,7 @@ def update_single(
     dark_dither,
     eight_dot,
     distance,
-    no_preprocess,
+    preprocess,
     weight_h,
     weight_s,
     weight_v,
@@ -291,7 +297,7 @@ def update_single(
     gamma,
     contrast,
     hue,
-    disable_colors,
+    use_colors,
     lut_file,
     state: AppState,
 ):
@@ -305,7 +311,7 @@ def update_single(
     else:
         state.lut_path = None
 
-    selected_disable_colors = [int(val) for val in disable_colors or [] if str(val).isdigit()]
+    selected_disable_colors = to_disabled_colors(use_colors)
 
     params = {
         "color_system": color_system,
@@ -313,7 +319,7 @@ def update_single(
         "dark_dither": dark_dither,
         "eight_dot": eight_dot,
         "distance": distance,
-        "no_preprocess": no_preprocess,
+        "no_preprocess": not preprocess,
         "weight_h": weight_h,
         "weight_s": weight_s,
         "weight_v": weight_v,
@@ -354,7 +360,7 @@ def batch_run(
     dark_dither,
     eight_dot,
     distance,
-    no_preprocess,
+    preprocess,
     weight_h,
     weight_s,
     weight_v,
@@ -366,7 +372,7 @@ def batch_run(
     gamma,
     contrast,
     hue,
-    disable_colors,
+    use_colors,
     lut_file,
     state: AppState,
 ):
@@ -377,7 +383,7 @@ def batch_run(
     else:
         state.lut_path = None
 
-    selected_disable_colors = [int(val) for val in disable_colors or [] if str(val).isdigit()]
+    selected_disable_colors = to_disabled_colors(use_colors)
 
     params = {
         "color_system": color_system,
@@ -385,7 +391,7 @@ def batch_run(
         "dark_dither": dark_dither,
         "eight_dot": eight_dot,
         "distance": distance,
-        "no_preprocess": no_preprocess,
+        "no_preprocess": not preprocess,
         "weight_h": weight_h,
         "weight_s": weight_s,
         "weight_v": weight_v,
@@ -495,60 +501,62 @@ def launch_app():
         state = gr.State(AppState())
 
         gr.Markdown("# MMSXX MSX1 Palette Quantizer for Hugging Face Spaces")
-        upload = gr.File(label="Upload images (PNG, up to 32)", file_count="multiple", file_types=["image"])
 
-        with gr.Accordion("Basic parameters", open=True):
+        gr.Markdown("### BASICパラメーターズ")
+        with gr.Row():
             color_system = gr.Dropdown(
                 label="Color System",
                 choices=["msx1", "msx2"],
                 value="msx1",
                 info="CLI default is msx1",
             )
-            with gr.Row():
-                eight_dot = gr.Dropdown(
-                    label="8dot",
-                    choices=["none", "fast", "basic", "best", "best-attr", "best-trans"],
-                    value="best",
-                    info="CLI default is best",
-                )
-                distance = gr.Dropdown(
-                    label="Distance",
-                    choices=["rgb", "hsv"],
-                    value="rgb",
-                    info="CLI default is rgb",
-                )
-            with gr.Row():
-                dither = gr.Checkbox(
-                    label="Dither",
-                    value=True,
-                    info="Default ON (CLI)",
-                )
-                dark_dither = gr.Checkbox(
-                    label="Dark dither",
-                    value=True,
-                    info="Default ON (CLI)",
-                )
-
-        with gr.Accordion("Advanced parameters", open=False):
-            no_preprocess = gr.Checkbox(
-                label="Skip preprocessing (--no-preprocess)",
-                value=False,
+            eight_dot = gr.Dropdown(
+                label="8dot",
+                choices=["none", "fast", "basic", "best", "best-attr", "best-trans"],
+                value="best",
+                info="CLI default is best",
             )
-            gr.Markdown("### Weights")
+            distance = gr.Dropdown(
+                label="Distance",
+                choices=["rgb", "hsv"],
+                value="rgb",
+                info="CLI default is rgb",
+            )
+            dither = gr.Checkbox(
+                label="Dither",
+                value=True,
+                info="Default ON (CLI)",
+            )
+            dark_dither = gr.Checkbox(
+                label="Dark dither",
+                value=True,
+                info="Default ON (CLI)",
+            )
+
+        upload = gr.File(label="Upload images (PNG, up to 32)", file_count="multiple", file_types=["image"])
+
+        with gr.Accordion("Weights", open=False):
             with gr.Row():
-                weight_h = gr.Number(label="HSV weight H", value=None, minimum=0, maximum=1, step=0.01, info="0-1")
-                weight_s = gr.Number(label="HSV weight S", value=None, minimum=0, maximum=1, step=0.01, info="0-1")
-                weight_v = gr.Number(label="HSV weight V", value=None, minimum=0, maximum=1, step=0.01, info="0-1")
+                weight_h = gr.Number(label="HSV weight H", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
+                weight_s = gr.Number(label="HSV weight S", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
+                weight_v = gr.Number(label="HSV weight V", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
             with gr.Row():
-                weight_r = gr.Number(label="RGB weight R", value=None, minimum=0, maximum=1, step=0.01, info="0-1")
-                weight_g = gr.Number(label="RGB weight G", value=None, minimum=0, maximum=1, step=0.01, info="0-1")
-                weight_b = gr.Number(label="RGB weight B", value=None, minimum=0, maximum=1, step=0.01, info="0-1")
+                weight_r = gr.Number(label="RGB weight R", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
+                weight_g = gr.Number(label="RGB weight G", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
+                weight_b = gr.Number(label="RGB weight B", value=1.0, minimum=0, maximum=1, step=0.01, info="0-1")
+
+        with gr.Group():
+            preprocessing = gr.Checkbox(
+                label="Preprocessing",
+                value=True,
+                info="Default ON (CLI). Turn off to skip preprocessing (--no-preprocess).",
+            )
 
             gr.Markdown("### Preprocess adjustments")
             with gr.Row():
                 posterize = gr.Number(
                     label="Posterize before processing",
-                    value=None,
+                    value=16,
                     minimum=0,
                     maximum=255,
                     step=1,
@@ -556,7 +564,7 @@ def launch_app():
                 )
                 saturation = gr.Number(
                     label="Pre-saturation",
-                    value=None,
+                    value=0.0,
                     minimum=0,
                     maximum=10,
                     step=0.01,
@@ -565,7 +573,7 @@ def launch_app():
             with gr.Row():
                 gamma = gr.Number(
                     label="Pre-gamma",
-                    value=None,
+                    value=1.0,
                     minimum=0,
                     maximum=10,
                     step=0.01,
@@ -573,7 +581,7 @@ def launch_app():
                 )
                 contrast = gr.Number(
                     label="Pre-contrast",
-                    value=None,
+                    value=1.0,
                     minimum=0,
                     maximum=10,
                     step=0.01,
@@ -581,24 +589,24 @@ def launch_app():
                 )
                 hue = gr.Number(
                     label="Pre-hue",
-                    value=None,
+                    value=0.0,
                     minimum=-180,
                     maximum=180,
                     step=1,
                     info="CLI default 0.0",
                 )
 
-            with gr.Accordion("Optional LUT", open=False):
-                lut_upload = gr.File(
-                    label="LUT file (optional)",
-                    file_types=[".cube", ".txt", ".lut", ".csv"],
-                    file_count="single",
-                )
+            gr.Markdown("### Optional LUT")
+            lut_upload = gr.File(
+                label="LUT file (optional)",
+                file_types=[".cube", ".txt", ".lut", ".csv"],
+                file_count="single",
+            )
 
-            disable_colors = gr.CheckboxGroup(
-                label="Disable palette colors (1-15)",
-                choices=[(f"Disable color {i}", str(i)) for i in range(1, 16)],
-                value=[],
+            use_colors = gr.CheckboxGroup(
+                label="USE COLOR (1-15)",
+                choices=[(f"Color {i}", str(i)) for i in range(1, 16)],
+                value=COLOR_CHOICES,
             )
 
         with gr.Row():
@@ -626,7 +634,6 @@ def launch_app():
             )
             batch_download = gr.DownloadButton(label="Download batch ZIP", interactive=False)
             batch_message = gr.Textbox(label="Batch status", interactive=False)
-            gr.Markdown("zip(メガロム) - 未実装 (coming soon)")
 
         logs_box = gr.Textbox(label="Logs", lines=10, interactive=False)
 
@@ -639,7 +646,7 @@ def launch_app():
                 dark_dither,
                 eight_dot,
                 distance,
-                no_preprocess,
+                preprocessing,
                 weight_h,
                 weight_s,
                 weight_v,
@@ -651,7 +658,7 @@ def launch_app():
                 gamma,
                 contrast,
                 hue,
-                disable_colors,
+                use_colors,
                 lut_upload,
                 state,
             ],
@@ -682,7 +689,7 @@ def launch_app():
                 dark_dither,
                 eight_dot,
                 distance,
-                no_preprocess,
+                preprocessing,
                 weight_h,
                 weight_s,
                 weight_v,
@@ -694,7 +701,7 @@ def launch_app():
                 gamma,
                 contrast,
                 hue,
-                disable_colors,
+                use_colors,
                 lut_upload,
                 state,
             ],
@@ -720,7 +727,7 @@ def launch_app():
                 dark_dither,
                 eight_dot,
                 distance,
-                no_preprocess,
+                preprocessing,
                 weight_h,
                 weight_s,
                 weight_v,
@@ -732,7 +739,7 @@ def launch_app():
                 gamma,
                 contrast,
                 hue,
-                disable_colors,
+                use_colors,
                 lut_upload,
                 state,
             ],
