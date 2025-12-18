@@ -1619,8 +1619,12 @@ def launch_app():
     default_lang = "ja"
     default_profile = SETTINGS_MANAGER.default_profile
     default_values = SETTINGS_MANAGER.values_for(default_profile)
+    blue_theme = gr.themes.Soft(
+        primary_hue=gr.themes.colors.blue,
+        secondary_hue=gr.themes.colors.blue,
+    )
 
-    with gr.Blocks(title="MMSXX MSX1 Palette Quantizer") as demo:
+    with gr.Blocks(title="MMSXX MSX1 Palette Quantizer", theme=blue_theme) as demo:
         state = gr.State(AppState(language=default_lang, profile_key=default_profile.key))
 
         settings_storage = gr.Textbox(value=current_settings_json(), visible=False, elem_id="local-settings-json")
