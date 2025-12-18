@@ -219,15 +219,48 @@ LOADING_BRIDGE = """
     document.documentElement.style.setProperty("--preview-scale", value);
   };
 
+  const getScaleValue = (container) => {
+    if (!container) return null;
+
+    const select = container.querySelector("select");
+    if (select?.value) return select.value;
+
+    const input = container.querySelector("input");
+    if (input?.value) return input.value;
+
+    const valueHolder =
+      container.querySelector("[data-testid='dropdown-value']") || container.querySelector("button");
+    if (valueHolder) {
+      const datasetValue = valueHolder.getAttribute("data-value") || valueHolder.dataset?.value;
+      if (datasetValue) return datasetValue;
+      const textValue = valueHolder.textContent?.trim();
+      if (textValue) return textValue;
+    }
+
+    return null;
+  };
+
   const attachScaleListener = () => {
     const root = gradioApp();
     if (!root) return;
-    const dropdown = root.querySelector("#preview-scale select, #preview-scale input");
-    if (!dropdown || dropdown.dataset.boundScale === "1") return;
-    dropdown.dataset.boundScale = "1";
-    const sync = () => updateScale(dropdown.value);
-    dropdown.addEventListener("change", sync);
-    dropdown.addEventListener("input", sync);
+    const container = root.querySelector("#preview-scale");
+    if (!container || container.dataset.boundScale === "1") return;
+    container.dataset.boundScale = "1";
+
+    const sync = () => updateScale(getScaleValue(container));
+
+    container.addEventListener("change", sync);
+    container.addEventListener("input", sync);
+    container.addEventListener("click", () => setTimeout(sync, 0));
+
+    const observer = new MutationObserver(sync);
+    observer.observe(container, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+    });
+
     sync();
   };
 
