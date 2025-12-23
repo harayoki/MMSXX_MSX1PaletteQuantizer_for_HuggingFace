@@ -1,0 +1,233 @@
+:root {
+  color-scheme: light;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #0f172a;
+  background-color: #f8fafc;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at 10% 20%, rgba(79, 70, 229, 0.08), transparent 30%),
+    radial-gradient(circle at 80% 0%, rgba(14, 165, 233, 0.08), transparent 35%),
+    #f8fafc;
+}
+
+main {
+  max-width: 1200px;
+  padding: 2.5rem 1.5rem 3rem;
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: 2.6rem;
+  margin: 0 0 0.4rem;
+  letter-spacing: -0.03em;
+}
+
+p.lead {
+  margin: 0 0 1.5rem;
+  color: #334155;
+}
+
+section {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 1.5rem;
+  box-shadow: 0 15px 45px rgba(15, 23, 42, 0.06);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.upload-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dropzone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 14px;
+  padding: 1.25rem;
+  background: #f8fafc;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.dropzone:hover {
+  border-color: #6366f1;
+  background-color: #eef2ff;
+}
+
+label {
+  font-weight: 600;
+  color: #0f172a;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+input[type='file'],
+input[type='range'],
+input[type='color'] {
+  width: 100%;
+}
+
+.file-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.file-card {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.file-card:hover {
+  transform: translateY(-1px);
+  border-color: #cbd5e1;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05);
+}
+
+.file-card.active {
+  border-color: #6366f1;
+  box-shadow: 0 15px 35px rgba(99, 102, 241, 0.12);
+}
+
+.thumb {
+  width: 80px;
+  height: 80px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+}
+
+.file-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.file-meta strong {
+  color: #0f172a;
+}
+
+.muted {
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.control-value {
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.canvas-shell {
+  background: #0f172a;
+  border-radius: 14px;
+  padding: 1rem;
+  border: 1px solid #1e293b;
+  min-height: 420px;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 0.75rem;
+}
+
+canvas {
+  width: 100%;
+  max-height: 480px;
+  border-radius: 12px;
+  border: 1px solid #1e293b;
+  background: repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.04),
+      rgba(255, 255, 255, 0.04) 10px,
+      transparent 10px,
+      transparent 20px
+    ),
+    radial-gradient(circle at 30% 20%, rgba(99, 102, 241, 0.14), transparent 35%),
+    radial-gradient(circle at 80% 30%, rgba(56, 189, 248, 0.12), transparent 30%),
+    #0f172a;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+button {
+  border: none;
+  padding: 0.8rem 1.1rem;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.12s ease, background-color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+button.primary {
+  background: linear-gradient(120deg, #6366f1, #8b5cf6);
+  color: white;
+  box-shadow: 0 15px 35px rgba(99, 102, 241, 0.25);
+}
+
+button.secondary {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+@media (max-width: 720px) {
+  h1 {
+    font-size: 2rem;
+  }
+
+  .canvas-shell {
+    min-height: 320px;
+  }
+}
