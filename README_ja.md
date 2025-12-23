@@ -1,37 +1,33 @@
 # MMSXX_MSX1PaletteQuantizer_for_HuggingFace
 
-MMSXX MSX1 Palette Quantizer を Hugging Face Spaces（CPU, Gradio）で動かすためのアプリです。プリビルトの CLI ツールを呼び出して、画像を MSX1 向け形式へ変換します。
+SvelteKit ベースのフロントエンドに切り替えました。画像のアップロード／ダウンロードはそのままに、エフェクト処理は準備中のためキャンバス上でダミーのプレビューを即時描画します。
 
 ## 特長
-- PNG 画像を最大 32 枚アップロードし、変換結果を並べてプレビューできます。
-- 重要な変換パラメータ（color system, dithering, dark dithering, 8dot, distance など）を調整し、単体またはバッチで再実行できます。
-- オプションで LUT ファイルをアップロードし、指定された場合のみコンバータへ渡します。
-- 画像単体の PNG / SC2 ダウンロード、バッチ ZIP（png/sc2/dsk/32krom）ダウンロードに対応します。MegaROM は未実装として表示されます。
+- PNG / JPEG など複数画像をまとめてアップロードし、カードからプレビュー対象を選択可能。
+- エフェクト強度・グレイン量・カラーアクセントをスライダーで調整し、キャンバスにダミー効果を重ねて確認。
+- キャンバス出力（ダミー効果込み）と元画像のダウンロードに対応。
+- ドラッグ＆ドロップやリセットボタンを備えたシンプルなUI。
 
 ## 必要環境
-- Python 3.9 以上
-- `bin/` 以下に含まれる Linux 向けバイナリに実行権限が必要です。
-- 依存インストール: `pip install -r requirements.txt`
+- Node.js 18 以上
+- npm
 
 ## ローカルでの実行手順
-1. バイナリに実行権限を付与します。
+1. 依存関係をインストールします。
    ```bash
-   chmod +x bin/msx1pq_cli bin/basic_sc2_viewer.bin bin/create_sc2_32k_rom.bin
+   npm install
    ```
-2. Python 依存をインストールします。
+2. 開発サーバを起動します。
    ```bash
-   pip install -r requirements.txt
+   npm run dev
    ```
-3. Gradio アプリを起動します。
+   `http://localhost:5173` でキャンバスプレビュー付きのUIを確認できます。
+3. 本番ビルドを確認する場合:
    ```bash
-   python app.py
+   npm run build
+   npm run preview
    ```
-4. ターミナルに表示されるローカル URL をブラウザで開きます。
-
-## Hugging Face Spaces での利用
-Spaces 上では `bin/` のバイナリを Python から直接実行します（ビルド不要）。エントリポイントは `app.py` で、起動時にバイナリへ実行権限を付与します。
 
 ## 補足
-- UI で未指定のオプションは CLI のデフォルトを使用し、明示的に選択された引数のみを渡します。
-- DSK バッチ生成は 720KB のディスク容量を超えると追加を停止し、除外されたファイルを報告します。
-- 32KB ROM 作成は最大 2 枚の SC2 ファイルのみ使用し、超過分は警告とともにスキップします。
+- エフェクト処理は将来提供予定の実装に置き換え予定で、現状はダミーのビジュアルエフェクトをキャンバスに重ねています。
+- 以前の Python / Gradio 用バイナリやスクリプトはリポジトリに残っていますが、最新のUIは SvelteKit 単体で動作します。
