@@ -1624,7 +1624,7 @@ def launch_app():
         secondary_hue=gr.themes.colors.blue,
     )
 
-    with gr.Blocks(title="MMSXX MSX1 Palette Quantizer", theme=blue_theme) as demo:
+    with gr.Blocks() as demo:
         state = gr.State(AppState(language=default_lang, profile_key=default_profile.key))
 
         settings_storage = gr.Textbox(value=current_settings_json(), visible=False, elem_id="local-settings-json")
@@ -2241,12 +2241,12 @@ def launch_app():
             ],
         )
 
-    return demo
+    return demo, blue_theme
 
 
 def main():
-    demo = launch_app()
-    demo.queue().launch(css=CUSTOM_CSS)
+    demo, theme = launch_app()
+    demo.queue().launch(css=CUSTOM_CSS, theme=theme, title="MMSXX MSX1 Palette Quantizer")
 
 
 if __name__ == "__main__":
